@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="钻井井眼清洁、岩屑床预测、CFD代理与PSO多目标约束优化教学案例。">
+<title>井眼清洁与岩屑运移优化 · Petro × AI Atlas</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="site-wrap">
+<header class="doc-head">
+  <nav class="crumb" aria-label="页面层级"><span>总览</span><i>/</i><span>作业链</span><i>/</i><span>钻井</span><i>/</i><strong>井眼清洁与岩屑运移优化</strong></nav>
+  <div class="dh-kicker"><span class="tag">环节 03 · 钻井</span><span class="tag method">OPT 优化算法</span><span class="tag method-ml">CFD 代理模型 + PSO</span><span class="tag case"><span class="small-dot"></span> 案例 d6-hole-cleaning · v1.1.0</span></div>
+  <h1 class="dh-title">井眼清洁与岩屑运移优化</h1>
+  <p class="dh-sub">低侧岩屑床会使摩阻、扭矩与卡钻风险上升；盲目提高排量却可能使泵压和井底 ECD 越限。本案例演示如何用<strong>流动代理模型预测 + PSO 安全优化</strong>提出建议，再由司钻结合返砂等现场信息最终授权。</p>
+  <div class="dh-tags"><span class="dtag">● 难度 高</span><span class="tag">D6</span><span class="tag subdued">CFD / MOO / Human-in-the-loop</span></div>
+</header>
+<nav class="tabs" role="tablist" aria-label="案例三大板块">
+  <button type="button" class="tab on" id="tab-bg" data-tab="bg" role="tab" aria-selected="true" aria-controls="panel-bg"><span>01</span> 专业背景</button>
+  <button type="button" class="tab" id="tab-flow" data-tab="flow" role="tab" aria-selected="false" aria-controls="panel-flow"><span>02</span> 案例流程</button>
+  <button type="button" class="tab" id="tab-demo" data-tab="demo" role="tab" aria-selected="false" aria-controls="panel-demo"><span>03</span> 交互演示</button>
+</nav>
+<main>
+<section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+  <div class="judge"><div><small>数据形态</small><b>多相流 + 时序</b><span>井斜、排量、转速、泵压、流变</span></div><div><small>标注成本</small><b>高</b><span>岩屑床难以井下直测</span></div><div><small>可见收益</small><b>清洁与控险</b><span>降低卡钻风险并约束压耗</span></div><div><small>工程难度</small><b>高</b><span>CFD 校准和场景外推</span></div></div>
+  <div class="intro"><span class="eyebrow">01 / PROBLEM DEFINITION · WHY AI WORKS</span><p>在高斜度井和水平井中，岩屑受重力滑向井眼下侧，流体剪切不足时形成岩屑床。<b>提高排量可能提升清洁，但不能无限制加大泵压。</b> AI 的职责是在可行安全边界内快速比较参数组合，绝不能替代井控工程师和司钻。</p></div>
+  <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec4-body"><h2>岩屑为什么会在水平段堆积？</h2><p>泥浆从钻柱内部进入钻头喷嘴，再沿钻杆与井壁之间的环空向地面返回。水平段重力分量将较大的岩屑颗粒拉向低侧，局部流速不足、泥浆屈服值不合适或钻杆偏心时容易形成静止岩屑床。积床可推高摩阻、扭矩、环空压耗，并增加缩径与卡钻风险。</p>
+  <p class="field-analogy"><b>把它想成一条平放的排水管：</b>水在上侧流动，泥沙却可能留在管底。高斜度井同样如此；当钻杆偏心、岩屑粒径较大或局部剪切应力不足时，岩屑先滚动/滑移，再沉积成床。沉积后环空有效流通面积缩小，扭矩和起下钻阻力可能升高。问题并非只由一个“临界返速”决定。</p>
+   <p>经典定向井实验 <a class="ref" href="https://doi.org/10.2118/12123-PA" target="_blank" rel="noopener noreferrer">Tomren 等，SPE-12123-PA（1986）</a> 系统研究了井斜、流速、流变、钻杆旋转与偏心；<a class="ref" href="https://doi.org/10.2118/20421-MS" target="_blank" rel="noopener noreferrer">SPE-20421-MS（1990）</a> 区分低侧滚动/滑移与悬浮输运两种机制。它们共同支持一个现场判断：<b>增排量有帮助，但“冲得越猛越好”并不成立。</b></p>
+   <figure class="paper-figure"><div class="figure-head"><b>水平井段 · 低侧岩屑床剖面</b><span>ANNULAR FLOW / CUTTINGS BED</span></div>
+  <svg viewBox="0 0 850 320" role="img" xmlns="http://www.w3.org/2000/svg" aria-label="水平井段剖面：钻杆居中略偏低，环空上部泥浆携岩向左返流，低侧形成岩屑床，标注返速和临界携岩条件">
+    <defs><linearGradient id="mudFill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d8ebe3"/><stop offset="1" stop-color="#eff5f0"/></linearGradient><pattern id="ground" width="13" height="13" patternUnits="userSpaceOnUse"><path d="M0 13L13 0" stroke="#d9cbb3" stroke-width=".7"/></pattern><marker id="a1" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L7 4L0 8" stroke="#2f7d6b" fill="none" stroke-width="1.5"/></marker><marker id="a2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L7 4L0 8" stroke="#b26a39" fill="none" stroke-width="1.5"/></marker></defs>
+    <rect x="24" y="17" width="802" height="285" rx="7" fill="#fdfcf9" stroke="#e9e4d8"/>
+    <rect x="58" y="68" width="734" height="190" fill="url(#ground)" stroke="#bdb4a4"/><rect x="74" y="87" width="701" height="151" rx="14" fill="url(#mudFill)" stroke="#96a7a1" stroke-width="2"/>
+    <path d="M74 207Q166 190 250 207T442 203T600 208T775 207V226Q646 229 538 224T315 226T74 224Z" fill="#a78c67" stroke="#8e7655" stroke-width="1.7"/>
+    <rect x="85" y="144" width="680" height="39" rx="19" fill="#bac5c0" stroke="#67776f" stroke-width="2.5"/><path d="M86 164H764" stroke="#eef1ee" stroke-width="1.4" stroke-dasharray="13 8"/>
+    <g fill="#b26a39"><circle cx="154" cy="202" r="7"/><circle cx="249" cy="199" r="5"/><circle cx="349" cy="203" r="8"/><circle cx="463" cy="199" r="6"/><circle cx="550" cy="199" r="7"/><circle cx="672" cy="203" r="6"/></g>
+    <path d="M680 117H170" stroke="#2f7d6b" stroke-width="3.5" marker-end="url(#a1)"/><text x="420" y="109" text-anchor="middle" font-size="15" fill="#235f51" font-weight="600">环空携岩返流 · v<tspan baseline-shift="sub" font-size="10">a</tspan> ←</text>
+    <text x="96" y="42" font-size="13" fill="#4d565b">上侧较高流速区</text><text x="635" y="44" font-size="13" fill="#8e5229">钻杆转动扰动床层</text>
+    <path d="M620 184L677 265" fill="none" stroke="#b26a39" stroke-width="1.5" stroke-dasharray="5 3" marker-end="url(#a2)"/><text x="690" y="277" font-size="12" fill="#8e5229">岩屑床</text>
+    <text x="76" y="281" font-size="11.5" fill="#79828a">临界携岩条件：v<tspan baseline-shift="sub" font-size="9">a</tspan>、流变、粒径及钻杆偏心共同决定，不存在万能流速阈值</text>
+  </svg><figcaption>图 1｜高斜度与水平段的环空返流、岩屑低侧沉积及再悬浮示意。颗粒输运受井斜、粒径、钻杆偏心、转速和非牛顿流变共同影响，图中方向与尺寸仅为教学示意。</figcaption></figure>
+  <p><b>为什么可能“冲漏”？</b>泵排量增加通常会提高循环压耗，某些井段还可能推高 ECD，使井底压力接近或超过地层承压边界。只看地面立管泵压不足以判断漏失：还须独立计算环空压力剖面、ECD、破裂压力窗口及设备额定值。<a class="ref" href="https://doi.org/10.1016/j.petrol.2020.107136" target="_blank" rel="noopener noreferrer">Busch 与 Johansen（2020）</a> 的 CFD 研究还指出，钻杆侧向运动与偏心会改变岩屑床的剪切和携岩响应。</p>
+   <table class="dtable contrast-table"><thead><tr><th>现场思路</th><th>擅长什么</th><th>容易忽略什么</th></tr></thead><tbody><tr><td>经验固定排量</td><td>操作直观、容易执行</td><td>新井斜和新流变下的沉积/压耗差异</td></tr><tr><td>逐方案运行 CFD/DEM</td><td>解析局部速度、岩屑迁移机理</td><td>实时遍历大量候选的算力成本</td></tr><tr><td>CFD 代理 + 约束 PSO</td><td>快速比较多组参数与安全裕度</td><td>需要可信训练域、误差校准和人工授权</td></tr></tbody></table></div></div>
+  <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec4-body">
+   <h2>让 CFD 做“教材”，让代理模型做“速查表”，让 PSO 替工程师试方案</h2>
+   <p><b>Why Surrogate：</b>真实 CFD/CFD–DEM 必须求解流场与颗粒相互作用，还要考虑非牛顿流变、岩屑粒径和钻杆偏心。单次计算成本可能明显高于普通回归推理；具体运行时间随网格、耦合与硬件而异，不能固定承诺“几十小时”或“0.01 秒”。可以先用<b>实验数据 + 已校验的 CFD 样本</b>训练代理模型，把排量 Q、转速 RPM、井斜、PV/YP、粒径等输入映射成床高、环空浓度和压力损失的预测，并在误差范围内快速评估候选方案。<a class="ref" href="https://doi.org/10.1002/ese3.70088" target="_blank" rel="noopener noreferrer">2025 年井眼偏心 CFD 研究</a>显示这些条件确实会共同改变携岩效果。</p>
+   <p><b>Why PSO：</b>候选的排量与转速互相牵制，且响应曲面未必凸。PSO 把每组参数看作一只“找食物的鸟”：每只记住自己发现的好方案，群体共享当前较优位置，反复修正搜索方向。它不保证全局最优，因此还要做<b>离散网格复核、可行性检查及人工批准</b>。</p>
+   <article class="math-card academic-math"><div class="card-head"><b>带硬约束的井眼清洁多目标优化</b><span>CONSTRAINED MOO / ENGINEERING OBJECTIVE</span></div>
+     <div class="math-equation" role="math" aria-label="最小化 J 等于 w1 倍归一化岩屑床高度 加 w2 倍归一化压耗 加 w3 倍控制变化惩罚">
+       <span class="math-word">min</span><i>J</i><span>=</span><i>w</i><sub>1</sub><i>H̄</i><sub>bed</sub><span>+</span><i>w</i><sub>2</sub>Δ<i>P̄</i><sub>ann</sub><span>+</span><i>w</i><sub>3</sub><i>R</i><sub>change</sub>
+     </div>
+     <div class="math-constraint-grid"><span class="constraint-label">subject to</span><div><span><i>P</i><sub>pump</sub> ≤ <i>P</i><sub>limit</sub></span><span>ECD<sub>pore</sub> + <i>m</i> ≤ ECD ≤ ECD<sub>fracture</sub> − <i>m</i></span><span><i>Q</i><sub>min</sub> ≤ <i>Q</i> ≤ <i>Q</i><sub>max</sub>，RPM 在设备允许范围</span></div></div>
+     <p><b>工程翻译：</b>H̄<sub>bed</sub> 是已归一化的岩屑床高度，ΔP̄<sub>ann</sub> 是归一化环空压耗，R<sub>change</sub> 是频繁调参代价；<i>w</i><sub>1/2/3</sub> 是权重。<b>安全限制不是随意调权重的目标：</b>泵压或 ECD 越界时，候选直接判为不可行。无解时应停止推荐并请求人工复核。</p>
+   </article>
+ </div></div>
+ <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec4-body"><h2>模型要知道什么，才能判断“冲得干净又安全”？</h2><table class="dtable"><thead><tr><th>信息组</th><th>现场字段</th><th>对预测的作用</th></tr></thead><tbody><tr><td>井眼与工具</td><td>井斜、井径、钻杆外径、偏心度</td><td>环空流道与低侧积床</td></tr><tr><td>钻井控制</td><td>排量、转速、机械钻速、扭矩</td><td>岩屑源项与床面扰动</td></tr><tr><td>钻井液</td><td>密度、PV、YP、温度</td><td>非牛顿流变与携岩能力</td></tr><tr><td>水力与颗粒</td><td>泵压、ECD、粒径分布、返砂</td><td>安全约束与实际效果评估</td></tr><tr><td>人工反馈</td><td>司钻授权、筛上岩屑、再循环时长</td><td>对齐时延并校准下一轮优化</td></tr></tbody></table></div></div>
+  <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec4-body"><h2>代理模型很快，但为什么不能直接自动控泵？</h2><p>固液两相流涉及沉降、床面侵蚀、颗粒滚动和局部湍流；泥浆流变非线性，岩屑粒径分布也不断变化。代理模型若未见过某种井径或地层岩屑，可能高估携岩、低估压力风险。</p><div class="callout"><b>Human-in-the-loop：</b>司钻应核对岩屑筛返出、摩阻变化、钻具振动与井控窗口，可以要求“再循环 10 分钟”而非简单采纳机器推荐。页面参数、泵压红线和床厚清除率都是教学假设，绝不应用于现场自动控制。</div></div></div>
+<div class="refs-card"><div class="eyebrow">REFERENCES / VERIFIED RESEARCH</div><h2>参考文献与工程依据</h2><ol>
+<li><a href="https://doi.org/10.2118/12123-PA" target="_blank" rel="noopener noreferrer">Tomren, Iyoho &amp; Azar (1986), SPE-12123-PA</a> · 定向井岩屑运移实验、井斜与泥浆流变影响</li>
+<li><a href="https://doi.org/10.2118/20421-MS" target="_blank" rel="noopener noreferrer">Experimental Investigation of Drilled Cuttings Transport in Inclined Boreholes (1990), SPE-20421-MS</a> · 低侧滚动与悬浮携岩机制</li>
+<li><a href="https://doi.org/10.2118/201709-MS" target="_blank" rel="noopener noreferrer">SPE-201709-MS (2020)</a> · 非牛顿流体中岩屑输运的可视化与电阻率层析成像实验</li>
+<li><a href="https://doi.org/10.1016/j.petrol.2020.107136" target="_blank" rel="noopener noreferrer">Busch &amp; Johansen (2020)</a> · 钻杆旋转、侧向运动与岩屑床 CFD 研究</li>
+<li><a href="https://doi.org/10.1109/ICNN.1995.488968" target="_blank" rel="noopener noreferrer">Kennedy &amp; Eberhart (1995)</a> · 粒子群优化原始算法</li>
+</ol><p>文献研究了不同的工况和模型边界；课堂数值（如 22 MPa 红线、40 min 清床率）为模拟设定，不是这些论文报告的统一作业阈值。</p></div>
+</section>
+<section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+  <div class="eyebrow">02 / MACHINE ADVISES · DRILLER AUTHORIZES</div><h2 class="section-title">五步理解：让机器快速试方案，让司钻决定执行</h2><p class="lead">机器把昂贵的流固模拟压缩成一个快速预测器，再对多种排量和转速组合进行安全筛选；人工保留最后的执行权。</p>
+  <div class="why-grid">
+ <article class="why-card"><span class="eyebrow">WHY NOT ONLINE CFD?</span><h3>CFD 是“精细实验室”，不是现场快速试菜单</h3><p>高分辨率模型能解释颗粒运动，但每改一次排量、转速都重新求解，计算量过大。代理模型是<b>经 CFD/实验教过的速查表</b>：快速预测而不代替实验校准。</p></article>
+ <article class="why-card"><span class="eyebrow">WHY PARTICLE SWARM?</span><h3>PSO 像一群鸟分头探路</h3><p>粒子分头试不同 <i>Q</i> / RPM，结合各自最好经验与群体最好经验调整。<b>先过硬安全门，再评估清洁成本</b>；未找到安全解要诚实返回无解。</p></article>
+</div>
+<div class="pipeline">
+    <article class="pipe"><span class="pipe-k">01 / DATA</span><div class="pipe-ico">◉</div><b>现场数据收集</b><p>输入：井斜、流量、转速、泵压、泥浆流变与返砂情况。</p><small>机器输出 → 可用工况窗口</small></article>
+    <article class="pipe"><span class="pipe-k">02 / SURROGATE</span><div class="pipe-ico">◇</div><b>代理模型快算</b><p>像“模拟器速查表”，一次预测床高、浓度和压耗。</p><small>机器输出 → 参数响应曲面</small></article>
+    <article class="pipe"><span class="pipe-k">03 / PSO</span><div class="pipe-ico">◎</div><b>粒子群安全寻优</b><p>很多候选点一起搜索，先剔除越限，再比较清洁效果。</p><small>机器输出 → 最佳可行候选</small></article>
+    <article class="pipe human"><span class="pipe-k">04 / HUMAN</span><div class="human-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="3"/><path d="M6 21v-6a6 6 0 0 1 12 0v6M9 14v7m6-7v7"/></svg></div><b>司钻授权决策</b><p>核对返砂、压力、井壁情况；采纳、微调或增加洗井时间。</p><small>人 · 最终授权</small></article>
+    <article class="pipe"><span class="pipe-k">05 / FEEDBACK</span><div class="pipe-ico">↺</div><b>效果复核回流</b><p>记录实设值、泵压、岩屑返出与异常原因，下一次更可靠。</p><small>人 → 数据 → 代理模型</small></article>
+  </div>
+  <div class="handoff"><span>机器：预测 + 可行解筛选</span><b>→ 人机交接线 · HUMAN AUTHORIZATION →</b><span>司钻：现场确认 / 追加循环</span></div>
+  <article class="math-card pso-math"><div class="card-head"><b>PSO 如何更新“找路方向”？</b><span>PARTICLE VELOCITY UPDATE</span></div>
+ <div class="math-equation small" role="math" aria-label="速度新值等于惯性项加个体历史最优吸引项加群体最优吸引项"><i>v</i><sub>t+1</sub> = ω<i>v</i><sub>t</sub> + <i>c</i><sub>1</sub><i>r</i><sub>1</sub>(<i>p</i><sub>best</sub> − <i>x</i><sub>t</sub>) + <i>c</i><sub>2</sub><i>r</i><sub>2</sub>(<i>g</i><sub>best</sub> − <i>x</i><sub>t</sub>)</div>
+ <p><i>x</i><sub>t</sub> 表示本次排量/转速候选；<i>p</i><sub>best</sub> 是粒子自己试过的最好参数，<i>g</i><sub>best</sub> 是群体找到的最好<b>可行</b>参数。随机系数提供探索，惯性权重保持搜索趋势。更新后的候选仍须逐次接受泵压和 ECD 安全筛查。</p>
+</article>
+<div class="flow-bottom">
+ <div class="code-card"><div class="code-head"><b>核心伪代码 · PSO 先过安全门</b><span>PYTHON · PSEUDOCODE</span></div>
+<pre><code><span class="cm"># 离线：用已验证的 CFD / 试验数据训练代理</span>
+surrogate.fit(cfd_cases, experiment_labels)
+
+<span class="cm"># 在线：多粒子搜索排量 Q 和转速 RPM</span>
+particles = init_swarm(flow=(18, 50), rpm=(40, 140))
+for iteration in range(40):
+    for p in particles:
+        h, dp, pump, ecd = surrogate.predict(p.q, p.rpm, mud)
+        <span class="hl">feasible = (pump &lt;= P_LIMIT and ecd_in_window(ecd))</span>
+        if feasible:
+            <span class="hl">score = w1 * norm(h) + w2 * norm(dp)</span>
+        else:
+            score = float("inf")   <span class="cm"># 越界直接淘汰</span>
+        update_pbest_gbest(p, score)
+    update_velocity_position(particles)
+
+proposal = best_feasible_or_none()
+if proposal is None:
+    ask_engineer_to_review() <span class="cm"># 无安全解，不执行</span>
+else:
+    <span class="hl">request_driller_approval(proposal)</span>  <span class="cm"># 人类授权</span></code></pre>
+ </div>
+ <div class="flow-explain"><span class="eyebrow">TRANSLATE TO FIELD LANGUAGE</span><h3>“先看违不违规，再看好不好用”</h3>
+ <p>这段代码就像司钻请一群工程师同时比较不同排量/转速：每人拿一张候选卡。<b><code>if feasible</code></b> 是安检门，泵压或 ECD 越线，哪怕能冲掉更多岩屑也<b>直接作废</b>。</p>
+ <p>只有合格方案才比较清除效果和压耗。PSO 轮流交流“最好的那张卡”，最后交给司钻。机器<b>不自行调泵、不自动转速控制</b>；工程师可以选择继续循环 10 min 或推翻推荐。</p>
+ <div class="callout"><b>教学实现边界：</b>页面运行简化经验公式 + 离散 PSO，并用小网格复查最优候选；没有训练真实 CFD 网络。代理速度、预测误差以及现场可用性都必须经过独立基准验证。</div>
+ </div>
+</div>
+</section>
+<section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+  <div class="eyebrow">03 / CFD SURROGATE × PSO × HUMAN-IN-THE-LOOP</div><h2 class="section-title">岩屑床清洁优化实验台</h2><p class="lead">左侧显示床厚与水力安全包络，右侧演示 AI 安全建议与人工授权。滑块输入只是<b>人工草案预览</b>；点击采纳或执行人工设定后才改变模拟设备状态。</p>
+  <div class="statebar" id="statebar" role="status" aria-live="polite"><span class="state-dot"></span><strong id="state-message">正常循环 · 等待司钻授权参数</strong><span id="state-code">MONITORING</span></div>
+  <div class="lab-grid">
+    <div class="lab-left">
+      <article class="card"><div class="card-head"><b>岩屑床厚度 · 动态演化与参数敏感性</b><span>BED HEIGHT / CUTTINGS REMOVAL</span></div><svg id="bed-chart" viewBox="0 0 820 360" role="img" aria-label="左侧时间横轴与岩屑床厚度纵轴，右侧排量横轴与预测床厚纵轴，展示不同转速下的响应曲线"></svg><div class="legend"><span><i class="sw jade"></i>模拟实测床厚</span><span><i class="sw blue dash"></i>当前工况预测</span><span><i class="sw clay dash"></i>高转速敏感性</span></div><p class="figcap">图 2｜左：随模拟时间变化的岩屑床厚度；右：不同排量下预测的清洁结果。无新岩屑补给的循环净清理假设，仅用于演示趋势。</p></article>
+      <article class="card"><div class="card-head"><b>泵压安全包络线 · 候选参数可行域</b><span>STANDPIPE PRESSURE · MPa</span></div><svg id="pump-chart" viewBox="0 0 820 240" role="img" aria-label="横轴排量L每秒纵轴泵压MPa，标出不同转速的泵压曲线、22 MPa安全红线、当前执行点及人工候选点"></svg><div class="legend"><span><i class="sw jade"></i>当前执行</span><span><i class="sw blue"></i>候选预览</span><span><i class="sw red dash"></i>安全红线</span></div><p class="figcap">图 3｜教学泵压代理随排量增加而增大；泵压安全线不是地层破裂压力曲线，真实应用还必须独立核算 ECD。</p></article>
+      <article class="card bed-visual"><div class="card-head"><b>低侧岩屑床 · 清除过程可视化</b><span>SCHEMATIC CROSS SECTION</span></div><svg id="bed-section" viewBox="0 0 820 132" role="img" aria-label="环空侧视图显示岩屑床随循环逐渐减薄，越限工况下暂停教学清理进度"></svg><p class="figcap">图 4｜岩屑床高度与再悬浮过程简图；超过泵压红线时演示器冻结清理进程，表示停止将该越限方案视为可执行建议，并非宣称真实岩屑会停止运动。</p></article>
+      <article class="card explainer-card"><div class="card-head"><b>AI 正在计算什么？</b><span>MODEL DIAGNOSTICS</span></div><div class="diag-grid"><div><small>环空平均返速</small><b id="velocity-val">—</b><em>m/s</em></div><div><small>当前清洁系数</small><b id="cleaning-val">—</b><em>min⁻¹</em></div><div><small>预计 40 min 净清除</small><b id="remove-val">—</b><em>%</em></div><div><small>泵压候选裕度</small><b id="margin-val">—</b><em>MPa</em></div></div><p>代理模型把“排量、转速、流变与几何”映射为床厚/压耗；PSO 用这个快速模型扫描参数，但不会直接控制真实钻机。</p><div class="field-check"><b>现场与模型的四重核验</b><div><span>泵压约束</span><strong id="check-pump">待校验</strong></div><div><span>ECD / 漏失窗口</span><strong>现场独立核算</strong></div><div><span>振动筛岩屑返出</span><strong>司钻目视复核</strong></div><div><span>代理外推可信度</span><strong>超出训练域需复核</strong></div></div></article>
+    </div>
+    <div class="lab-right">
+      <article class="card metrics-card"><div class="card-head"><b>当前执行工况</b><span>LIVE DRILLING CONDITIONS</span></div><div class="metrics"><div><small>实际排量 Q</small><b id="flow-now">—</b><span>L/s</span></div><div><small>实际转速 RPM</small><b id="rpm-now">—</b><span>rpm</span></div><div><small>当前泵压</small><b id="pressure-now">—</b><span>MPa</span></div><div><small>当前床厚估计</small><b id="bed-now">—</b><span>cm</span></div></div><div class="metrics-foot"><span>教学安全线 <b>22.0 MPa</b></span><span>模拟时刻 <b id="clock-now">T+0</b></span></div></article>
+      <article class="card ai-card" id="ai-card"><div class="card-head"><b>AI 助手 · 安全优化候选</b><span>CFD SURROGATE + PSO</span></div><div class="ai-alert"><span class="ai-pulse"></span><div><strong id="ai-title">已生成可行候选 · 待司钻审核</strong><p id="ai-reason">AI 在虚拟泵压和 ECD 安全边界内比较清洁效率与水力代价。</p></div></div><div class="ai-metrics"><div><small>建议排量</small><b id="rec-flow">32 L/s</b></div><div><small>建议转速</small><b id="rec-rpm">80 rpm</b></div><div><small>理想净清除预测</small><b id="rec-removal">约 80%</b></div><div><small>预测泵压</small><b id="rec-pressure">—</b></div></div><p class="minor">推荐仅作为教学示例：图表运行的是机理启发的合成代理公式，而非已训练 CFD 神经网络；40 min 理想循环忽略新增钻屑，现场须独立校验 ECD。</p></article>
+      <div class="handoff handoff-compact"><span>机器：推荐参数 + 约束检查</span><b>→ 司钻最终授权 →</b><span>现场：返砂 / 摩阻复核</span></div>
+      <article class="card decision-card"><div class="human-gate"><span class="gate-dot"></span> HUMAN IN THE LOOP · 等待司钻授权</div><div class="card-head"><b>人工设定 · Human-in-the-loop</b><span>DRILLER DECISION GATE</span></div><p>滑块只预览候选，不会直接执行。现场观察（如振动筛岩屑异常）优先于机器的最优数字。</p><label for="flow-input">排量设定 <output id="flow-out">24 L/s</output></label><input type="range" id="flow-input" min="18" max="50" step="1" value="24"><div class="slider-ends"><span>18 L/s</span><span>50 L/s</span></div><label for="rpm-input">钻杆转速 <output id="rpm-out">60 rpm</output></label><input type="range" id="rpm-input" min="40" max="140" step="5" value="60"><div class="slider-ends"><span>40 rpm</span><span>140 rpm</span></div><label for="mu-input">塑性黏度代理 <output id="mu-out">24 mPa·s</output></label><input type="range" id="mu-input" min="16" max="36" step="2" value="24"><div class="slider-ends"><span>16 mPa·s</span><span>36 mPa·s</span></div><div class="preview-pill" id="preview-status">人工草案预测：安全窗口内</div><div class="actions"><button type="button" class="btn primary" id="accept-btn">采纳 AI 优化参数</button><button type="button" class="btn secondary" id="manual-btn">执行人工设定（教学模拟）</button></div><div class="sub-action"><button type="button" class="btn ghost" id="circulate-btn">司钻要求额外循环 10 min</button><button type="button" class="btn ghost" id="reset-btn">重置</button></div><p class="decision-note" id="decision-note">等待司钻操作。超限草案会显示警告，即使在教学模拟中执行也不会被标为安全方案。</p></article>
+      <article class="card"><div class="card-head"><b>人机交接 · 操作反馈日志</b><span>HUMAN → MODEL</span></div><ol class="audit-list" id="audit-log" aria-live="polite"><li>等待人工采纳、微调或决定延长循环；日志将保留参数和风险解释。</li></ol><div class="audit-foot"><span>人工反馈 <b id="audit-count">0</b> 条</span><span>代理校准版本 <b id="model-version">v1</b></span></div></article>
+    </div>
+  </div>
+  <p class="safety-note">教学声明：全部图表、床高、压力红线、响应系数及“80%”清除预测都是虚构的简化代理，没有连接井场设备；实际控制需校核泵设备、ECD/破裂压力窗口与井控程序，并由工程人员独立授权。</p>
+</section>
+</main>
+<footer><span>Petro × AI Atlas · 井眼清洁与岩屑运移优化</span><span>D6 / SURROGATE / PSO / HUMAN AUTHORITY</span></footer>
+</div>
+<script src="demo.js"></script>
+</body>
+</html>

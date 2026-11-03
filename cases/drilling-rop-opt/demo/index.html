@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>钻速预测与参数优化 · Petro × AI Atlas</title>
+  <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="case-page">
+  <div class="crumb" aria-label="所在位置">总览 <i>/</i> 作业链 <i>/</i> 钻井 <i>/</i> <span>钻速预测与参数优化</span></div>
+  <header class="detail-head">
+    <div class="dh-kicker">
+      <span class="tag">环节 03 · 钻井</span>
+      <span class="tag method">TS 时序预测</span>
+      <span class="tag method opt">OPT 参数优化</span>
+      <span class="tag case">● 案例 drilling-rop-opt · v1.1.0</span>
+    </div>
+    <h1 class="dh-title">钻速预测与参数优化</h1>
+    <p class="dh-sub">钻头破岩效率并不只由 WOB 和 RPM 决定，还随岩性、围压、钻头磨损、清洁能力和振动状态变化。以 MSE 监测和 IADC 钻头磨损评级为工程依据，本案例讲解：时序模型如何预测响应、约束优化如何筛选参数，以及司钻如何在安全门之后决定是否采纳。</p>
+    <div class="dh-tags"><span class="dtag" data-d="高">难度 高</span><span class="tag scene">D1</span><span class="tag muted-tag">Human-in-the-loop · 人在回路</span></div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="案例内容导航">
+    <button class="tab on" role="tab" id="tab-bg" aria-controls="panel-bg" aria-selected="true" data-tab="bg"><span class="num">01</span>专业背景</button>
+    <button class="tab" role="tab" id="tab-flow" aria-controls="panel-flow" aria-selected="false" data-tab="flow"><span class="num">02</span>案例流程</button>
+    <button class="tab" role="tab" id="tab-demo" aria-controls="panel-demo" aria-selected="false" data-tab="demo"><span class="num">03</span>交互演示</button>
+  </nav>
+
+  <main>
+    <section class="panel on" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+      <div class="lede-block"><div class="eyebrow">BACKGROUND / ENGINEERING CONTEXT</div><h2>钻头破岩效率为什么随井段动态变化？</h2><p>钻压提供切削齿的轴向侵入载荷，转速影响单位时间切削次数，但单位进尺能耗还由岩石强度、围压、钻头切削齿磨损与井底岩屑清除控制。真正有意义的优化是在<strong>安全与装备约束</strong>内提高有效 ROP，而不是盲目增大 WOB 或 RPM。</p></div>
+      <div class="judge" aria-label="30 秒判断">
+        <div class="jc"><div class="jl">数据形态</div><div class="jv">多变量时序</div><div class="jd">钻压 / 转速 / 扭矩 / 钻速</div></div>
+        <div class="jc"><div class="jl">标注成本</div><div class="jv">中—高</div><div class="jd">复杂工况需人工核实</div></div>
+        <div class="jc"><div class="jl">可见收益</div><div class="jv">效率与风险兼顾</div><div class="jd">提速必须先满足安全约束</div></div>
+        <div class="jc"><div class="jl">技术难度</div><div class="jv">高</div><div class="jd">外推、漂移与安全闭环</div></div>
+      </div>
+      <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec4-body">
+        <h3>井底载荷与钻压：破岩增益伴随机械风险</h3>
+        <p>PDC 钻头依靠切削齿刮削/剪切破岩，牙轮钻头则主要依靠压入破碎；实际载荷传递还受到钻柱摩阻影响。硬夹层、钻头切削齿钝化、井底岩屑重复破碎，都会改变 WOB–RPM–ROP 响应：最优组合具有明显的<strong>随深度、地层与钻头状态变化</strong>的特征。Dupriest 与 Koederitz 在 <a class="ref-inline" href="https://doi.org/10.2118/92194-MS" target="_blank" rel="noopener noreferrer">SPE-92194-MS</a> 中介绍了利用 MSE 在线识别低效钻进状态并支持参数优化的方法。</p>
+
+      <div class="math-card engineering-math" aria-label="机械比能计算公式与物理意义">
+        <div class="ac-head"><strong>机械比能 MSE · 为什么可以辅助判断破岩效率？</strong><span>TEALE 1965 / SPE-208777-PA</span></div>
+        <div class="math-formula" role="math" aria-label="机械比能等于钻压除以钻头面积，加上二派乘井底扭矩乘每秒转数除以钻头面积和每秒钻速的乘积">
+          <i>MSE</i><span>=</span><span class="frac"><span><i>WOB</i></span><span><i>A</i><sub>b</sub></span></span>
+          <span>+</span><span class="frac"><span>2π · <i>T</i><sub>bit</sub> · <i>N</i></span><span><i>A</i><sub>b</sub> · <i>v</i></span></span>
+        </div>
+        <p>式中 WOB 为作用于钻头的轴向力（N），<i>A</i><sub>b</sub> 为钻头截面积（m²），<i>T</i><sub>bit</sub> 为钻头扭矩（N·m），<i>N</i> 为转速（rev/s），<i>v</i> 为机械钻速（m/s）。按上述 SI 单位计算，MSE 的量纲为 Pa（J/m³）。</p>
+        <div class="math-note"><b>工程辨析</b> MSE 趋高常提示钻头工作效率下降，但其数值也受岩性、工况和测量误差影响；不能仅凭 MSE 单点判断钻头损坏。地面测得的扭矩不一定等于钻头扭矩，<a href="https://doi.org/10.2118/208777-PA" target="_blank" rel="noopener noreferrer">SPE-208777-PA</a> 强调总 MSE 与井下 MSE 的定义差异。[1][3]</div>
+      </div>
+        <div class="figure">
+          <!-- 高质量、离线可用的井底受力示意图（不是外链图片）。 -->
+          <svg viewBox="0 0 870 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="井底钻头受力与 Human-in-the-loop 安全约束示意">
+            <defs><pattern id="rock" width="22" height="18" patternUnits="userSpaceOnUse"><path d="M0 8L8 2M13 18L22 10" stroke="#e4d8c1" stroke-width="1"/></pattern><marker id="arr-j" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#2f7d6b" stroke-width="1.5"/></marker><marker id="arr-c" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#b26a39" stroke-width="1.5"/></marker></defs>
+            <rect x="12" y="10" width="846" height="263" rx="8" fill="#fdfcf9"/>
+            <rect x="35" y="35" width="340" height="204" rx="5" fill="#f5f2ea"/><rect x="35" y="184" width="340" height="55" fill="url(#rock)"/>
+            <path d="M108 35V182M298 35V182" stroke="#c9c2b0" stroke-width="5"/>
+            <rect x="185" y="28" width="36" height="133" rx="5" fill="#a3aaa9" stroke="#667276" stroke-width="2"/>
+            <rect x="179" y="158" width="48" height="27" rx="4" fill="#6b787b"/><path d="M169 182L179 163L179 182L188 164L198 184L207 164L227 182L239 169" fill="none" stroke="#566668" stroke-width="5"/>
+            <path d="M203 38V119" stroke="#2f7d6b" stroke-width="4" marker-end="url(#arr-j)"/>
+            <path d="M245 92C281 80 289 145 247 151" fill="none" stroke="#b26a39" stroke-width="3" marker-end="url(#arr-c)"/>
+            <g font-size="12" fill="#242b2e"><text x="92" y="31">钻柱 / Drill string</text><text x="112" y="106" fill="#235f51">钻压 WOB ↓</text><text x="273" y="98" fill="#8e5229">扭矩 T ↻</text><text x="262" y="171" fill="#4d565b">钻头</text><text x="51" y="224" fill="#4d565b">井底岩石 · 破岩与切削</text></g>
+            <line x1="406" y1="40" x2="406" y2="244" stroke="#e9e4d8"/>
+            <text x="434" y="48" font-size="13" font-weight="650" fill="#242b2e">安全约束如何进入优化？</text>
+            <rect x="434" y="68" width="166" height="49" rx="7" fill="#e6f1ec" stroke="#c0d8cf"/><text x="517" y="88" font-size="12" font-weight="600" text-anchor="middle" fill="#235f51">WOB / RPM / 工况</text><text x="517" y="105" font-size="10" text-anchor="middle" fill="#4d565b">传感器实时采集</text>
+            <path d="M600 92H637" stroke="#2f7d6b" stroke-width="2" marker-end="url(#arr-j)"/>
+            <rect x="641" y="68" width="187" height="49" rx="7" fill="#fff" stroke="#e9e4d8"/><text x="734" y="88" text-anchor="middle" font-size="12" font-weight="600" fill="#242b2e">AI 预测 ROP / Torque</text><text x="734" y="105" text-anchor="middle" font-size="10" fill="#79828a">给出候选而非指令</text>
+            <path d="M734 117V145" stroke="#2f7d6b" stroke-width="2" marker-end="url(#arr-j)"/>
+            <rect x="641" y="150" width="187" height="45" rx="7" fill="#f9e9e5" stroke="#e1c8c3"/><text x="734" y="169" text-anchor="middle" font-size="12" font-weight="600" fill="#922e2e">扭矩 / 工况安全门</text><text x="734" y="185" text-anchor="middle" font-size="10" fill="#922e2e">超限先过滤</text>
+            <path d="M641 173H604" stroke="#2f7d6b" stroke-width="2" marker-end="url(#arr-j)"/>
+            <rect x="434" y="150" width="166" height="67" rx="7" fill="#e6f1ec" stroke="#2f7d6b" stroke-width="2"/>
+            <circle cx="459" cy="170" r="7" fill="none" stroke="#235f51" stroke-width="2"/><path d="M447 195V190Q447 180 459 180Q471 180 471 190V195" fill="none" stroke="#235f51" stroke-width="2"/>
+            <text x="488" y="172" font-size="12" font-weight="650" fill="#235f51">司钻授权</text><text x="488" y="190" font-size="10" fill="#235f51">采纳 / 拒绝 / 微调</text><text x="488" y="205" font-size="9" fill="#235f51">Human-in-the-loop</text>
+            <text x="435" y="251" font-size="11" fill="#79828a">约束优先，人在最后一道授权门</text>
+          </svg>
+        </div>
+        <div class="figcap"><b>图 1</b><span>井底钻头受力与人机授权关系示意。钻压和转速共同作用于破岩过程；AI 候选值经过安全门，仍须司钻确认后才能生效。</span></div>
+      </div></div>
+      <div class="sec4"><div class="sn">02<span>MECHANISM</span></div><div class="sec4-body">
+        <h3>非线性最优点：更大钻压不等于更高钻速</h3>
+        <p>模型在不同 WOB、RPM 下推断 ROP 与扭矩。图中的绿色区域代表本教学模型满足扭矩约束的候选区，浅红区域表示超过限制或接近危险的参数区。两项指标分别使用不同的纵轴，避免尺度混淆。</p>
+        <div class="figure"><svg id="response-chart" viewBox="0 0 870 350" role="img" aria-label="WOB 为横轴、ROP 和扭矩分别使用左右坐标轴，含安全区、风险区与扭矩阈值"></svg></div>
+        <div class="figcap"><b>图 2</b><span>固定转速 120 rpm 时的模拟钻压—钻速—扭矩关系。非线性模型、扭矩限值均为教学假设，不代表特定钻头或井段。</span></div>
+      </div></div>
+      <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec4-body">
+        <h3>从钻机传感器到钻头磨损评级：建立可追溯训练数据</h3><p>井段 MD/TVD、岩性与岩石强度代理量、钻头型号及连续磨损记录用于条件化预测。WOB、RPM、ROP、扭矩、排量、立压、振动应按时间与井深对齐；连接、停泵、滑动/复合钻进、换钻头等状态必须打标签。数据集按井/井段和钻头寿命周期分组划分，避免相邻时刻训练—测试泄漏。IADC 在 2026 年发布的钻头/BHA 磨损评级手册强调损伤观察、故障报告和数据管理，为钻头状态标签提供推荐实践。</p>
+        <table class="dtable"><thead><tr><th>数据模块</th><th>代表变量</th><th>建模意义</th></tr></thead><tbody>
+          <tr><td>操作参数</td><td>WOB、RPM、排量 Q</td><td>可调决策变量，建议必须满足设备与井段边界</td></tr>
+          <tr><td>实时工况</td><td>扭矩、ROP、立管压力、振动</td><td>反映切削效率、摩阻、井底清洁与异常趋势</td></tr>
+          <tr><td>地层与钻头</td><td>井深、岩性、钻头型号、IADC 磨损评级</td><td>破岩方式和切削齿磨损共同改变响应面</td></tr>
+          <tr><td>人工反馈</td><td>采纳/拒绝原因、授权参数、后续效果</td><td>用于离线复盘、校准与模型再训练</td></tr>
+        </tbody></table>
+      </div></div>
+      <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec4-body">
+        <h3>标准化与模型泛化同样重要</h3><p>不同钻头、钻井液与层段下 MSE 的可比性有限，地面/井下测点和单位必须严格区分。IADC 钻头磨损评级资料是<strong>分类与数据记录的推荐实践</strong>，并不提供所有井场通用的 WOB、RPM 或扭矩红线。新地层与钻头状态偏移还可能使时序模型外推失效。真实安全门必须独立校验泵压/井漏、振动、井壁稳定和设备承载，必要时回退人工；本案例仅模拟 Torque 限值。</p>
+        <div class="callout warn"><span class="ci">边界</span><div>Human-in-the-loop 的本质是<strong>建议与执行解耦</strong>：拖动 AI 候选钻压不会直接执行；必须由司钻点击采纳，且候选值先经安全截断。人工可拒绝并实施手动参数，页面提供风险告警与记录，但并不连接真实设备。</div></div>
+      </div></div>
+
+      <section class="references" aria-label="工程标准及学术参考文献">
+        <div class="ac-head"><strong>工程标准与学术参考文献</strong><span>VERIFIABLE REFERENCES · 点击访问原文</span></div>
+        <p>以下为可核实的公开论文记录或协会官方资料；部分出版物的全文可能要求订阅。IADC 推荐实践用于磨损评级和数据质量管理，并非参数安全限值规范。</p>
+        <ol><li><a href="https://doi.org/10.1016/0148-9062(65)90022-7" target="_blank" rel="noopener noreferrer">[1] Teale, R. (1965). The concept of specific energy in rock drilling.</a><span>MSE 理论源头</span></li><li><a href="https://doi.org/10.2118/92194-MS" target="_blank" rel="noopener noreferrer">[2] Dupriest, F. E. &amp; Koederitz, W. L. (2005). Maximizing Drill Rates with Real-Time Surveillance of Mechanical Specific Energy. SPE-92194-MS.</a><span>MSE 在线监测与钻速优化</span></li><li><a href="https://doi.org/10.2118/208777-PA" target="_blank" rel="noopener noreferrer">[3] SPE Drilling &amp; Completion (2023). Standardization of Mechanical Specific Energy Equations and Nomenclature. SPE-208777-PA.</a><span>区分总 MSE 与井下 MSE、重视单位与测量误差</span></li><li><a href="https://iadc.org/drillbits/new-iadc-bit-and-bha-dull-grading-manual-now-available/" target="_blank" rel="noopener noreferrer">[4] IADC (2026). IADC Bit and BHA Dull Grading Manual — official announcement.</a><span>钻头/BHA 磨损评级、现场失效与数据管理推荐实践</span></li><li><a href="https://doi.org/10.1016/j.array.2026.100900" target="_blank" rel="noopener noreferrer">[5] 2026. Hybrid LSTM-desirability concept for drilling ROP prediction and optimization.</a><span>时序学习与钻速优化的研究实例</span></li></ol>
+      </section>
+    </section>
+
+    <section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+      <div class="lede-block"><div class="eyebrow">WORKFLOW / HUMAN–AI HANDOFF</div><h2>一条必须经过司钻的参数优化链</h2><p>模型负责识别规律，优化器负责筛选候选，安全门负责剔除越限建议，司钻负责决定是否执行，执行结果再反馈到系统。每个环节都有明确的职责和失败边界。</p></div>
+
+      <section class="why-ai" aria-label="为何需要时序模型而不是单一线性回归或 PID">
+        <div class="ac-head"><strong>WHY AI · 为什么线性回归与传统 PID 不够用？</strong><span>ENGINEERING RATIONALE</span></div>
+        <div class="why-grid">
+          <article><div class="mini-index">01 / LINEAR BASELINE</div><h3>线性回归难表达交互与状态变化</h3><p>线性模型如 <i>ROP</i> = β₀ + β₁WOB + β₂RPM 假设固定斜率，却难表达 WOB×RPM 交互、钻头磨损及岩性切换。它可以作基线，但要达到高精度通常需人为特征工程、分段模型或非线性结构。</p></article>
+          <article><div class="mini-index">02 / FEEDBACK PID</div><h3>PID 适合局部反馈，不负责多目标搜索</h3><p>PID 能稳住某个可测量量，但钻速是地层扰动下的结果变量，测量/执行响应有滞后，多条约束又同时存在。若简单追逐瞬时 ROP，可能带来调参振荡；PID 本身不是全局约束优化器。</p></article>
+          <article><div class="mini-index">03 / LSTM OR TCN</div><h3>时序网络从历史窗口识别隐状态</h3><p>LSTM/TCN 学习最近 WOB、RPM、ROP、Torque、排量的联合变化，结合岩性与钻头状态预测未来响应，捕捉多变量滞后与非线性。仍需训练域检查，且“看见相关性”不等于已识别可干预因果效果。</p></article>
+          <article><div class="mini-index">04 / PSO + GUARD</div><h3>优化算法在可行域内比较候选</h3><p>对不同 WOB/RPM 候选调用条件预测器，先过滤 Torque、泵压及设备约束，再综合钻速、调节幅度和风险裕度。候选只给司钻看，未经授权绝不下发。</p></article>
+        </div>
+      </section>
+      <div class="pipeline" aria-label="五阶段人机协同流程">
+        <div class="pipe"><div class="pipe-index">01 <span>DATA</span></div><div class="pipe-icon">▤</div><h3>传感器采集</h3><p>WOB、RPM、ROP、扭矩、排量、地层上下文</p><small>机器 · 采样与清洗</small></div>
+        <div class="pipe"><div class="pipe-index">02 <span>MODEL</span></div><div class="pipe-icon">◇</div><h3>时序模型预测</h3><p>预测候选参数下的钻速与扭矩响应</p><small>机器 · 多步预测</small></div>
+        <div class="pipe"><div class="pipe-index">03 <span>SAFETY</span></div><div class="pipe-icon">▣</div><h3>安全约束过滤</h3><p>检查扭矩红线、设备范围与工况有效性</p><small>机器 · 不合格剔除</small></div>
+        <div class="pipe human"><div class="pipe-index">04 <span>HUMAN</span></div><svg class="person" viewBox="0 0 42 42" role="img" aria-label="人类司钻"><circle cx="21" cy="10" r="6"/><path d="M9 35V26C9 15 33 15 33 26V35M15 27V37M27 27V37"/></svg><h3>司钻最终授权</h3><p>采纳、拒绝或微调，并记录现场理由</p><small>人 · 不可跳过</small></div>
+        <div class="pipe"><div class="pipe-index">05 <span>FEEDBACK</span></div><div class="pipe-icon">↺</div><h3>操作反馈回流</h3><p>执行值、实际 ROP、扭矩及人工决策日志</p><small>人 → 模型 · 离线校准</small></div>
+      </div>
+      <div class="handoff"><span class="machine-line">机器计算与安全约束</span><strong>→ 人机交接线 →</strong><span class="human-line">司钻授权后执行</span><span class="back-line">↶ 反馈回流至数据层</span></div>
+      <div class="sec4"><div class="sn">01<span>MODEL</span></div><div class="sec4-body"><h3>由历史时序预测候选工况</h3><p>真实系统可以使用 GRU、TCN 或 Transformer 预测未来钻速与扭矩；示范为了离线可运行，使用显式、可检查的非线性代理公式。预测器不具备现场认证，其结果仅用于理解约束优化与人机交互。</p></div></div>
+      <div class="sec4"><div class="sn">02<span>OPTIMIZE</span></div><div class="sec4-body"><h3>只在可行域搜索，不把预测值当命令</h3><p>定义安全可行域 Ω = {WOB, RPM：预测扭矩 ≤ 红线 − 裕量，并满足其他工程边界}。离散搜索在 Ω 内找到高钻速候选，再交给司钻。超限候选只能被截断或标记，不能绕过审批。</p></div></div>
+      <div class="sec4"><div class="sn">03<span>HUMAN</span></div><div class="sec4-body"><h3>人机权责：AI 建议，司钻批准</h3><p>候选滑块只控制建议值。点击“采纳 AI 建议”后才形成一次授权动作；点击“拒绝并人工接管”则切换控制权。人工微调可能越过教学红线，界面会发出显著警报，同时保留人工决策记录以便课后复盘。</p></div></div>
+      <div class="sec4"><div class="sn">04<span>FEEDBACK</span></div><div class="sec4-body"><h3>每次决策都留下可审计记录</h3><p>日志包含时间、动作类型、人工值、AI 候选值、预测扭矩与风险判断；本演示将少量观测偏差用于图中的预测校正，模拟人工反馈的数据价值，但不进行真实模型在线训练。</p></div></div>
+
+      <div class="sec4"><div class="sn">05<span>MODEL</span></div><div class="sec4-body">
+        <h3>时序条件预测与约束寻优：模型到底算什么？</h3>
+        <p>用过去 <i>L</i> 个时间点构造历史窗口 <i>H</i><sub>t</sub>，引入候选控制 <i>u</i> = (WOB, RPM)。时序网络估计在该候选工况下未来 <i>H</i> 步的 ROP 和 Torque，并用候选之间的比较选择参数。一个简化的滚动优化目标为：</p>
+        <div class="math-card">
+          <div class="ac-head"><strong>带安全门的钻速优化</strong><span>CONSTRAINED ROP OPTIMIZATION</span></div>
+          <div class="math-formula formula-objective" role="math" aria-label="在允许参数集合中寻找最大化预测钻速减去调节惩罚的控制变量">
+            <span class="optop"><span class="math-op">max</span><small>u ∈ Ω</small></span>
+            <span>[</span> <span class="predicted"><i>ROP</i></span>(<i>H</i><sub>t</sub>,<i>u</i>) <span>−</span> λ ‖<i>u</i> − <i>u</i><sub>prev</sub>‖² <span>]</span>
+          </div>
+          <div class="constraint-grid">
+            <span><b>目标</b> 最大化预测 ROP，同时抑制参数大幅跳变</span>
+            <span><b>约束 A</b> <i>T</i><sub>pred</sub> ≤ <i>T</i><sub>limit</sub> − δ</span>
+            <span><b>约束 B</b> Δ<i>P</i><sub>pump</sub> ≤ <i>P</i><sub>max</sub></span>
+            <span><b>约束 C</b> WOB、RPM、设备额定范围与工况有效性</span>
+          </div>
+          <p class="math-explainer">这里 δ 是预测不确定性与测量误差的安全裕量。<b>实际演示只实现扭矩过滤</b>，泵压和井漏边界列为工程部署必需条件，并没有在浏览器中伪装成已验证的联锁。</p>
+        </div>
+        <div class="model-logic"><div><b>① 预测</b><span>历史序列 + 候选参数 → ROP、Torque</span></div><div><b>② 搜索</b><span>PSO / GA 在参数边界内尝试不同组合</span></div><div><b>③ 安全门</b><span>越限拒绝；给出推荐与拒绝原因</span></div><div class="authorized"><b>④ 人工审核</b><span>司钻采纳或拒绝，记录原因再执行</span></div></div>
+        <div class="code-card"><div class="code-heading"><b>Python 教学伪代码 · 条件时序预测 + PSO 约束优化</b><span>NOT EXECUTED IN DEMO</span></div><pre><code># history: [time, WOB, RPM, ROP, Torque, flow, lithology, ...]
+# model 是已离线训练的 LSTM/TCN 条件预测器
+# 返回候选控制 u 下的未来 ROP、Torque、pump_delta_p
+
+def objective(u, history, model, previous_u):
+    wob, rpm = u
+    if not (50 &lt;= wob &lt;= 190 and 80 &lt;= rpm &lt;= 160):
+        return float("inf")
+
+    rop, torque, pump_dp = model.predict(history, [wob, rpm])
+    if torque &gt; TORQUE_LIMIT - margin:
+        return float("inf")
+    if pump_dp &gt; PUMP_DP_LIMIT:
+        return float("inf")
+
+    smooth_penalty = lam * ((wob - previous_u[0])**2
+                            + (rpm - previous_u[1])**2)
+    return -rop + smooth_penalty  # PSO 通过最小化寻找高 ROP
+
+# PSO 返回可行候选；随后需独立安全校验和人工授权
+candidate = pso_minimize(lambda u: objective(u, history, model,
+                                                previous_u), bounds)
+if independent_safety_check(candidate):
+    show_to_driller(candidate)  # 不是 send_to_rig()
+</code></pre><p class="code-note">代码展示真实系统的接口关系，PSO、predict 和独立安全核查需要由工程系统实现。当前浏览器演示沿用原有<strong>固定 RPM 下离散 WOB 搜索 + 合成非线性响应</strong>，并没有真实 LSTM/TCN 权重或泵压预测。</p></div>
+      </div></div>
+      <div class="callout"><span class="ci">评价</span><div>教学评价维度：ROP 预测误差、扭矩越限事件、采纳率、人工干预次数、反馈日志完整率。实际现场还应纳入井漏、振动、井壁安全和设备限额。</div></div>
+    </section>
+
+    <section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+      <div class="lede-block demo-lede"><div class="eyebrow">INTERACTIVE DEMO / DRILLER CONSOLE</div><h2>司钻参与的安全钻速优化实验台</h2><p>先让 AI 给出最优候选，再调高 AI 候选钻压观察安全截断；然后切换人工模式，把钻压逐步调高直至扭矩冲破红线。注意“预测建议”和“已授权执行”是两套独立参数。</p></div>
+      <div class="status-strip" id="status-strip" role="status" aria-live="polite"><span class="pulse-dot"></span><strong id="hitl-status">Human-in-the-loop：当前由司钻接管</strong><span id="safety-status">实时监测：正常</span></div>
+      <div class="dashboard">
+        <aside class="card controls control-academic">
+          <div class="card-title"><strong>控制面板</strong><span>PARAMETERS / HUMAN CONTROL</span></div>
+          <div class="field-title"><label for="ai-wob">AI 候选钻压 WOB</label><output id="ai-wob-out">130 kN</output></div>
+          <input type="range" id="ai-wob" min="60" max="190" step="1" value="130"><div class="range-ends"><span>60 kN</span><span>190 kN</span></div>
+          <div class="field-title"><label for="trim">司钻手动微调</label><output id="trim-out">+0 kN</output></div>
+          <input type="range" id="trim" min="-70" max="105" step="1" value="0"><div class="range-ends"><span>−70 kN</span><span>+105 kN</span></div>
+          <div class="field-title"><label for="rpm">转速 RPM</label><output id="rpm-out">120 rpm</output></div>
+          <select id="rpm"><option value="100">100 rpm · 保守</option><option value="120" selected>120 rpm · 常规</option><option value="140">140 rpm · 提速</option></select>
+          <p class="field-note">手动基准钻压为 80 kN；变更 AI 候选值不会自动执行。</p>
+          <div class="handoff-message"><span class="handoff-icon">↪</span><span><b>机器建议 → 司钻确认</b><small>推荐只供审核；点击采纳后才进入模拟执行目标</small></span></div><div class="actions"><button class="btn primary" id="accept">✓ 采纳 AI 建议（司钻授权）</button><button class="btn secondary" id="reject">↶ 拒绝 AI · 人工接管</button></div>
+          <div class="readline"><span>AI 约束过滤后候选</span><b id="safe-candidate">—</b></div>
+          <div class="readline"><span>司钻已授权目标</span><b id="authorized-wob">—</b></div>
+          <div class="readline"><span>执行钻压（动态响应）</span><b id="wob-now">—</b></div>
+          <div class="readline"><span>扭矩警戒线（教学值）</span><b class="danger-text">14.40 kN·m</b></div>
+          <p id="decision-info" class="decision-info">初始人工模式。请选择 AI 或调整手动参数。</p>
+          <div class="controls-brief"><b>工程备注 / CONTROL BOUNDARY</b><p>现场应核实钻头磨损、泥浆排量、立压、井壁稳定与设备额定能力。这里的 14.40 kN·m 为<strong>合成教学红线</strong>，不构成真实钻机控制建议。</p></div>
+        </aside>
+        <div class="plot-column">
+          <div class="readouts"><div class="readout"><small>当前实际 ROP</small><strong id="rop-actual">—</strong><span>m/h</span></div><div class="readout"><small>模型预测 ROP</small><strong id="rop-forecast">—</strong><span>m/h</span></div><div class="readout"><small>实时井底扭矩</small><strong id="torque-actual">—</strong><span>kN·m</span></div><div class="readout"><small>预测扭矩</small><strong id="torque-forecast">—</strong><span>kN·m</span></div></div>
+          <div class="figure chart-card"><div class="card-title"><strong>多变量时序观测</strong><span>模拟 1 min/步 · 动画 0.65 s</span></div><svg id="live-chart" viewBox="0 0 870 430" role="img" aria-label="上方为预测和实测钻速时间曲线，下方为井底扭矩与安全红线"></svg><div class="legend"><span><i class="legend-stroke actual"></i>实际 ROP</span><span><i class="legend-stroke predict"></i>预测 ROP</span><span><i class="legend-stroke torque"></i>实测 Torque</span><span><i class="legend-stroke limit"></i>安全红线</span></div></div>
+          <div class="figcap"><b>图 3</b><span>钻速与扭矩时序模拟。上下图分别独立定标，浅红色区域为扭矩警戒区；司钻的参数调整会改变未来曲线。</span></div>
+        <div class="card chart-interpretation">
+          <div class="card-title"><strong>曲线解读 · 为什么最优参数必须随工况更新？</strong><span>ENGINEERING DIAGNOSTICS</span></div>
+          <div class="interpretation-grid">
+            <div><b>预测残差 / DRIFT</b><p>实测 ROP 长期偏离预测时，优先检查岩性变化、钻头钝化及测点质量，不要立即继续加钻压。</p></div>
+            <div><b>扭矩裕量 / MARGIN</b><p>扭矩接近安全界限不等于卡钻已发生，仍需核实摩阻、振动、泵压与井底清洁情况。</p></div>
+            <div><b>机械比能 / MSE</b><p>若 ROP 未随 WOB/RPM 增加且比能上升，可能正在低效破岩；应结合钻头磨损评级复盘。</p></div>
+          </div>
+          <div class="interpretation-foot"><b>Human-in-the-loop：</b>实时曲线只是辅助证据；模型出现外推、传感器异常或独立安全检查不通过时，司钻应按现场程序处理。</div>
+        </div>
+        </div>
+      </div>
+      <div class="audit-grid"><div class="card audit-card"><div class="card-title"><strong>Human-in-the-loop 人工反馈日志</strong><span><b id="log-count">0</b> 条决策</span></div><div class="audit-guide">时间 · 操作类型 · 司钻目标 · AI 候选 · 风险判定</div><ol id="audit-list" aria-live="polite"><li class="empty-log">尚无操作，点击采纳、拒绝或松开微调滑块后将生成记录。</li></ol></div><div class="card audit-explain"><div class="card-title"><strong>模型回流与责任边界</strong><span>FEEDBACK / GOVERNANCE</span></div><p><b>预测偏差校正：</b><span id="bias-value">+0.00 m/h</span></p><p><b>反馈机制：</b>授权或人工修改后的观测数据进入离线校准队列，不会在现场直接重训并接管设备。</p><p><b>关键教学点：</b>机器推荐≠执行命令。任何超限风险应由人结合真实井场程序处理。</p></div></div>
+      <div class="callout warn"><span class="ci">声明</span><div>本案例中的 ROP、扭矩、时间序列、红线和安全过滤均为合成教学模型，不适合直接控制钻机或制定现场钻井参数。卡钻警报仅表示模拟阈值越限，并不表示真实卡钻概率。</div></div>
+    </section>
+  </main>
+  <footer class="footnote"><span>Petro × AI Atlas · Drilling / d1</span><span>Human-in-the-loop：司钻拥有最终授权权</span></footer>
+</div>
+<script src="demo.js"></script>
+</body>
+</html>

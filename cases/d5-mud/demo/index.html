@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="钻井液软测量、ECD 安全窗口与泥浆工程师人工配方审核。">
+<title>钻井液性能智能调控 · Petro × AI Atlas</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="site-wrap">
+  <header class="doc-head">
+    <nav class="crumb" aria-label="页面层级"><span>总览</span><i>/</i><span>作业链</span><i>/</i><span>钻井</span><i>/</i><strong>钻井液性能智能调控</strong></nav>
+    <div class="dh-kicker"><span class="tag">环节 03 · 钻井</span><span class="tag tech">TS 时序预测</span><span class="tag opt">OPT 优化算法</span><span class="tag case"><i class="dot"></i>案例 d5-mud · v1.1.0</span></div>
+    <h1 class="dh-title">钻井液性能智能调控</h1>
+    <p class="dh-sub">井下高温高压、非牛顿流变和长循环响应使泥浆调控成为带滞后、多约束的决策问题。本案例通过<b>软测量（Soft Sensing）</b>估计井下流体状态，再用<b>多目标约束优化</b>建议配方；<b>泥浆工程师</b>审查岩屑、井壁与循环情况后决定是否执行。</p>
+    <div class="dh-tags"><span class="dtag" data-d="中">● 难度 中</span><span class="tag">D5</span><span class="tag soft">Soft Sensing · ECD · Human-in-the-loop</span></div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="案例三大板块">
+    <button type="button" class="tab on" data-tab="bg" role="tab" id="tab-bg" aria-controls="panel-bg" aria-selected="true"><span>01</span> 专业背景</button>
+    <button type="button" class="tab" data-tab="flow" role="tab" id="tab-flow" aria-controls="panel-flow" aria-selected="false"><span>02</span> 案例流程</button>
+    <button type="button" class="tab" data-tab="demo" role="tab" id="tab-demo" aria-controls="panel-demo" aria-selected="false"><span>03</span> 交互演示</button>
+  </nav>
+
+  <main>
+    <section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+      <div class="judge">
+        <div><small>数据形态</small><strong>高低频融合</strong><span>立压、流量 / 化验记录</span></div>
+        <div><small>关键难点</small><strong>输送 + 化验滞后</strong><span>一次完整循环后才见响应</span></div>
+        <div><small>优化目标</small><strong>安全 + 经济</strong><span>ECD 处在井控窗口</span></div>
+        <div><small>决策责任</small><strong>人类最终授权</strong><span>AI 输出建议，不执行阀泵操作</span></div>
+      </div>
+      <div class="intro"><div class="eyebrow">ENGINEERING BACKGROUND · WHY AI WORKS</div><p>加药不是按下按钮就立刻改变井底：泥浆先在池内混配，再经数千米钻杆下行、钻头喷嘴和环空上返，<b>输送与混合的响应可能达到数十分钟乃至一小时量级</b>（具体取决于井深、容积和排量，非固定常数）。如果上一轮处理剂还没到位，工程师就继续追加，容易形成“看着没反应 → 过量加药 → 响应叠加”的过调。<b>软测量是提前估计，而不是自动加药；人必须为井控边界拍板。</b></p></div>
+
+      <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec4-body"><h2>井下几千米的“延迟回音”：药加下去了，结果还在路上</h2>
+        <p>钻井液从泥浆池经泵和钻杆下行至钻头，再携岩屑沿环空返回地面。地面一勺加重剂改变的是混配池的配方，不是整个井筒“瞬间增重”。例如在大井深、低排量或大环空体积井段，完整周转可能接近一小时；具体应根据泵排量、井筒容积与混配时间计算。若只按“当前立压未变”反复加药，后续响应叠加可能使 ECD 超过破裂压力边界。与此同时，井下温度、压力和剪切历史会改变非牛顿流变性质，地面检测值不等于井下原位值。关于在线检测与实时水力监测的实际工程研究，可参见 <a class="ref-link" href="https://onepetro.org/SPEDC/proceedings-abstract/22DC/22DC/D032S009R001/482085" target="_blank" rel="noopener noreferrer">SPE-208694-MS</a> 与 <a class="ref-link" href="https://onepetro.org/SPEAPOG/proceedings-abstract/22APOG/22APOG/D022S003R001/511342" target="_blank" rel="noopener noreferrer">SPE-210777-MS</a>。</p>
+        <figure class="paper-figure"><div class="figure-head"><b>从地面加药到井下响应：长循环回路</b><span>CIRCULATION &amp; DELAY</span></div>
+          <svg viewBox="0 0 900 352" role="img" aria-label="泥浆泵经过立管沿钻杆向下，钻头喷嘴进入井底，携岩液沿环空返回地面泥浆池，显示入口传感器和时滞">
+            <defs><marker id="arrowJ" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#2f7d6b" stroke-width="1.4"/></marker><marker id="arrowC" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#b26a39" stroke-width="1.4"/></marker></defs>
+            <rect x="18" y="17" width="864" height="317" rx="6" fill="#fdfcf9" stroke="#e9e4d8"/>
+            <g stroke="#f1ede5" stroke-dasharray="4 6"><path d="M35 120H862M35 190H862M35 260H862"/></g>
+            <path d="M345 53H612V300H345Z" fill="#efece1" opacity=".64"/>
+            <rect x="465" y="66" width="70" height="234" rx="13" fill="#fff" stroke="#c9c2b0" stroke-width="3"/>
+            <rect x="491" y="73" width="18" height="207" rx="7" fill="#dfebe6" stroke="#2f7d6b" stroke-width="1.8"/>
+            <path d="M500 79V267" stroke="#2f7d6b" stroke-width="4" marker-end="url(#arrowJ)"/>
+            <path d="M480 280L480 98" stroke="#b26a39" stroke-width="3" stroke-dasharray="7 5" marker-end="url(#arrowC)"/>
+            <path d="M520 280V98" stroke="#b26a39" stroke-width="3" stroke-dasharray="7 5" marker-end="url(#arrowC)"/>
+            <path d="M491 282L500 301L509 282Z" fill="#79828a" stroke="#4d565b"/>
+            <g fill="#fff" stroke="#ddd7c8" stroke-width="2"><rect x="70" y="79" width="112" height="61" rx="7"/><rect x="233" y="79" width="90" height="61" rx="7"/><rect x="683" y="84" width="141" height="59" rx="7"/></g>
+            <path d="M182 111H233M323 110H500V73" stroke="#2f7d6b" stroke-width="3" fill="none" marker-end="url(#arrowJ)"/>
+            <path d="M520 75H627V111H683" stroke="#b26a39" stroke-width="3" fill="none" marker-end="url(#arrowC)"/>
+            <g fill="#242b2e" font-size="13" text-anchor="middle"><text x="126" y="105">泥浆池 + 配药</text><text x="126" y="123" font-size="10.5" fill="#79828a">人工批准后混配</text><text x="278" y="105">泥浆泵</text><text x="278" y="123" font-size="10.5" fill="#79828a">入口 Q / T</text><text x="753" y="110">返出及固控</text><text x="753" y="129" font-size="10.5" fill="#79828a">岩屑 / 流量监测</text></g>
+            <text x="544" y="197" fill="#235f51" font-size="11">钻杆内下行</text><text x="351" y="224" fill="#b26a39" font-size="11">环空上返</text><text x="539" y="302" fill="#4d565b" font-size="11">钻头</text>
+            <rect x="68" y="210" width="257" height="67" rx="6" fill="#f8ecdf" stroke="#e8d4bf"/>
+            <text x="83" y="233" fill="#8e5229" font-weight="700" font-size="12.5">主要挑战：循环滞后 τ</text><text x="83" y="254" fill="#4d565b" font-size="11">加药 → 井下 → 返出，不能即时到位</text>
+            <text x="753" y="293" fill="#79828a" text-anchor="middle" font-size="11">传感器看见的是滞后后的响应</text>
+          </svg>
+          <figcaption><b>图 1｜</b>钻井液地面—井下循环示意。箭头分别表示钻杆内下行和环空返出，滞后时间随井深、流量和混合体积变化，不能按固定秒数替代真实水力计算。</figcaption>
+        </figure>
+        <p>以同一深度的压力当量密度比较，<b>ECD 低于孔隙压力梯度</b>可能形成井涌风险，而<b>高于有效破裂压力梯度</b>可能导致漏失。ECD 不只由地面泥浆密度决定，还包括环空循环压耗；停泵与开泵时压力窗口可能不同，起下钻又会产生激动/抽汲压力。行业术语对应 <a class="ref-link" href="https://iadc.org/wp-content/uploads/2025/04/WSP_Definitions_rev2.pdf" target="_blank" rel="noopener noreferrer">IADC WellSharp 2025 定义</a>。</p>
+         <div class="comparison-card"><div class="card-head"><strong>为什么不是“看压力、凭经验加药”就够了？</strong><span>TRADITIONAL vs. AI-ASSISTED</span></div><table class="dtable"><thead><tr><th>现场环节</th><th>传统方案的局限</th><th>AI 辅助的增量价值</th></tr></thead><tbody><tr><td>井下状态</td><td>依赖低频化验和人工经验，井下真实条件难连续直测</td><td>用带滞后特征的时间窗估计井下密度、黏度并提示置信度</td></tr><tr><td>操作滞后</td><td>上次加药尚未显现时重复调配，易过调</td><td>预测未来响应并保留复测等待窗口</td></tr><tr><td>配方决策</td><td>重成本或只盯单一密度指标</td><td>先检查 ECD 约束，再综合成本、流变、调整幅度</td></tr><tr><td>最终授权</td><td>人凭经验判断，没有统一记录</td><td>工程师核对岩屑、化学兼容性和井控条件后签发并留痕</td></tr></tbody></table></div>
+      </div></div>
+
+      <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec4-body"><h2>先把“看不见的井下”估出来，再在安全范围内选配方</h2>
+        <p><b>Soft Sensing（软测量）通俗说像“根据体温、心率推测身体状态”：</b>井下密度和高温高压流变性质并不能在所有井段以低成本、高频率直接测到，但泵冲、入口排量、立管压力和温度一直在记录。把这些信息与循环时滞、稀疏化验值对齐，训练 XGBoost / LSTM 的回归映射，就能估计井下有效密度与表观黏度。这里是有历史校准、物理核对和误差条带的估计，<b>不是能“隔空看见”井底</b>。关于在线流变测量与低频人工化验的局限，参见 <a class="ref-link" href="https://onepetro.org/SPEMPDU/proceedings-abstract/26MPDU/26MPDU/807652" target="_blank" rel="noopener noreferrer">SPE-233721-MS</a>。</p>
+        <p><b>多目标优化（MOO）就像“安全第一的货比三家”：</b>加重剂越多不一定越好；它可能抬高静液柱压力，同时增加环空压耗与材料成本。降滤失剂的作用首先是滤失控制，配伍又影响流变。优化器枚举候选配方，先用地层孔隙—破裂压力安全窗口及工艺约束剔除违规方案，再在剩余方案中比较药剂成本、流变误差和加药幅度。<b>安全应作为硬约束，不能只靠高额罚分“买”出来。</b> 井漏管理中的人机协作有真实研究可参考：<a class="ref-link" href="https://onepetro.org/SPEDC/proceedings-abstract/25DC/25DC/D012S002R001/642534" target="_blank" rel="noopener noreferrer">SPE-223817-MS</a>。</p>
+        <article class="math-card"><div class="card-head"><strong>软测量训练目标 · 预测误差 + 正则化</strong><span>REGULARIZED MSE</span></div>
+          <div class="equation" role="math" aria-label="L 等于一除以 n 乘以残差平方和，加上 lambda 乘以正则项 Omega theta"><i>ℒ</i><span>=</span><span class="fraction"><span>1</span><span><i>n</i></span></span><span class="sigma">∑<small><i>i</i> = 1</small><sup><i>n</i></sup></span><span>(<i>y</i><sub>i</sub> − ŷ<sub>i</sub>)<sup>2</sup></span><span>+</span><span>λ Ω(θ)</span></div>
+          <p><b>y<sub>i</sub></b>：化验/校核标签；<b>ŷ<sub>i</sub></b>：预测值。选择 <b>Ω(θ)=‖θ‖²<sub>2</sub></b> 时是 L2 正则：第一项衡量“猜得准不准”，第二项防止参数过度贴合训练样本。不同模型正则化形式需按模型定义。实际需按时间、井和工况切分，不能将未来化验数据泄漏到当前预测。</p>
+        </article>
+        <article class="math-card equation-compact"><div class="card-head"><strong>井控边界的物理基础：ECD 与环空压耗</strong><span>HYDRAULICS / UNITS MATTER</span></div><div class="equation eq-multiline"><span><i>ECD</i>(<i>z</i>)</span><span>=</span><span>ρ<sub>eff</sub> + </span><span class="fraction"><span>Δ<i>P</i><sub>ann</sub>(<i>z</i>)</span><span><i>g</i> · <i>TVD</i>(<i>z</i>)</span></span></div><p>式中 ECD 与 ρ 使用 kg/m³，ΔP<sub>ann</sub> 为该点环空压耗（Pa），TVD 为垂深（m），g 为重力加速度（m/s²）。这是用于说明 ECD 来源的稳态简化式；真实井控还需考虑压力、温度、井深剖面及瞬态效应。</p></article>
+      </div></div>
+
+      <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec4-body"><h2>训练模型需要“快信号 + 慢化验 + 人工记录”</h2>
+        <table class="dtable"><thead><tr><th>数据层级</th><th>现场例子</th><th>用途</th></tr></thead><tbody><tr><td>高频循环信号</td><td>入口/返出流量、立管压力、泵冲、温度、井深</td><td>描述流动状态与滞后动态</td></tr><tr><td>低频实验室标签</td><td>密度、漏斗/旋转黏度、滤失、固相含量</td><td>校正软测量并检测漂移</td></tr><tr><td>井控及地层信息</td><td>孔隙/破裂压力窗口、漏失/气侵台账</td><td>安全约束与反事实评价</td></tr><tr><td>人工执行记录</td><td>加药量、时间、岩屑返出、现场判断</td><td>对齐响应滞后，形成高价值反馈</td></tr></tbody></table>
+        <p>训练和验证时需显式估计<b>输送延迟</b>，对齐采样时刻与化验所代表的泥浆体积，按照井段划分训练/测试集；同一井段相邻时间点随机拆分会高估预测效果。</p>
+      </div></div>
+
+      <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec4-body"><h2>模型可能很聪明，但不代表有安全授权</h2>
+        <p>盐污染、井下高温高压、温度依赖的非牛顿流变、固相沉积、剪切历史及处理剂间兼容反应导致强非线性；井漏、气侵样本又很少。入口传感器异常或泵状态切换可产生伪变化。推荐必须考虑预测区间、实时测值质量、未见工况、加药前后时滞和人员校核。</p>
+        <div class="callout warn"><b>Human-in-the-loop：</b>系统只能推荐“重晶石约 1.5%、降滤失剂约 0.8%”等虚拟课堂选项。泥浆工程师还须检查震动筛岩屑、井壁情况、化学相容性和井控要求，确认后才可进入现场操作流程。本页面的百分比、ECD 值与阈值均不构成实际配方建议。</div>
+       </div></div>
+        <div class="refs-block"><div class="eyebrow">SELECTED REFERENCES · 可核实的工业资料</div><ol class="reference-list"><li><a class="ref-link" href="https://onepetro.org/SPEDC/proceedings-abstract/22DC/22DC/D032S009R001/482085" target="_blank" rel="noopener noreferrer">SPE-208694-MS</a><span> · Development of Online Drilling Fluid Property Logging System；钻井液密度、流变在线检测与 ECD 分析，2022</span></li><li><a class="ref-link" href="https://onepetro.org/SPEAPOG/proceedings-abstract/22APOG/22APOG/D022S003R001/511342" target="_blank" rel="noopener noreferrer">SPE-210777-MS</a><span> · Delivering Proactive Real Time Drilling Decision for Extended Reach Drilling Well via Dynamic Trend-Based Monitoring System；结合水力、机械、热力模型进行实时趋势监测，2022</span></li><li><a class="ref-link" href="https://onepetro.org/SPEMPDU/proceedings-abstract/26MPDU/26MPDU/807652" target="_blank" rel="noopener noreferrer">SPE-233721-MS</a><span> · Closing the Loop: A Novel Autonomous In-Line Rheometer for Real-Time ECD Management；实时流变监测需求与周期性人工检查滞后，2026</span></li><li><a class="ref-link" href="https://iadc.org/wp-content/uploads/2025/04/WSP_Definitions_rev2.pdf" target="_blank" rel="noopener noreferrer">IADC WellSharp 2025</a><span> · WellSharp Definitions, Revision 2；井控窗口、ECD、井控屏障的行业术语定义</span></li><li><a class="ref-link" href="https://onepetro.org/SPEDC/proceedings-abstract/25DC/25DC/D012S002R001/642534" target="_blank" rel="noopener noreferrer">SPE-223817-MS</a><span> · Enhancing Lost Circulation Management by Data-Driven Agile Methods；井漏多源信息融合与人工审核，2025</span></li></ol><p class="reference-note">文献链接指向论文摘要或行业文件，部分全文可能需要机构访问；所引文献支撑工程问题背景，不代表本演示的模型已在现场得到验证。</p></div>    </section>
+
+    <section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+      <div class="eyebrow">02 / A HUMAN-AUTHORIZED CLOSED LOOP</div><h2 class="section-title">Why / How：机器怎么“提前猜”，又怎么“安全选”？</h2>
+      <p class="lead">AI 不是直接替代泥浆工程师，而是两步辅助：先把实时传感器翻译为井下状态估计，再像“货比三家”一样筛掉不安全配方、比较经济性。最终由工程师审核并记录执行结果。</p>
+      <div class="pipeline" aria-label="钻井液智能调控五步流程">
+        <article class="pipe"><span class="pipe-k">01 / SENSORS</span><div class="pipe-ico">◉</div><b>采集与对齐数据</b><p>输入：流量、立压、温度、化验值。机器去除泵停等无效状态，估计循环时滞。</p><small>输出 → 可用时间窗</small></article>
+        <article class="pipe"><span class="pipe-k">02 / SOFT SENSOR</span><div class="pipe-ico">≈</div><b>软测量预测</b><p>用 XGBoost/LSTM 将“看得见”的压力与温度映射为井下密度及表观黏度。</p><small>输出 → 状态估计 + 不确定性</small></article>
+        <article class="pipe"><span class="pipe-k">03 / MOO</span><div class="pipe-ico">◇</div><b>约束内配方寻优</b><p>比较加重剂和降滤失剂方案，剔除 ECD 越出孔隙—破裂窗口的候选。</p><small>输出 → 排序后的安全建议</small></article>
+        <article class="pipe human"><span class="pipe-k">04 / HUMAN</span><div class="human-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="3"/><path d="M6 21v-6a6 6 0 0 1 12 0v6M9 14v7m6-7v7"/></svg></div><b>泥浆工程师审核</b><p>结合岩屑大小、返出异常及井壁稳定性，采纳或修改方案。</p><small>人 · 最终授权</small></article>
+        <article class="pipe"><span class="pipe-k">05 / FEEDBACK</span><div class="pipe-ico">↺</div><b>执行与效果回流</b><p>记录实际加药、化验复测及井控情况，修正下一次软测量与推荐。</p><small>人 → 数据 → 模型</small></article>
+      </div>
+      <div class="handoff"><span>机器：发现状态并提出配方</span><strong>→ 人机交接 / 授权 →</strong><span>工程师：确认化学与井控安全</span></div>
+       <div class="sec4"><div class="sn">01<span>WHY SOFT SENSING</span></div><div class="sec4-body"><h2>为什么不直接等化验？因为“测得慢”与“反应慢”是两种不同的滞后</h2><p>化验仪可能每隔一段时间才提供密度、流变标签；软测量用连续的泵压、排量和温度等输入提前估计隐变量。另一方面，重晶石等处理剂需要混配和沿井筒输运，真实物性变化不会因为 AI 算得快就提前发生。<b>软测量缩短信息滞后，动态水力模型才用来预测物理响应。</b></p>
+       <article class="math-card academic-math"><div class="card-head"><strong>软测量损失：准确率与泛化的折中</strong><span>REGRESSION · MSE + L2</span></div><div class="equation"><i>ℒ</i><sub>soft</sub><span>=</span><span class="fraction"><span>1</span><span><i>N</i></span></span><span class="sigma">∑<small><i>i</i> = 1</small><sup><i>N</i></sup></span><span>(<i>y</i><sub>i</sub> − ŷ<sub>i</sub>)<sup>2</sup></span><span>+</span><span>λ‖<i>θ</i>‖<sup>2</sup><sub>2</sub></span></div><div class="math-key-grid"><div><b>第一项：猜得准吗？</b><span>预测密度/黏度与可用标签的平方差</span></div><div><b>第二项：会不会死记硬背？</b><span>λ 约束模型参数，降低过拟合倾向</span></div></div><p>在跨井段训练时，应按井/时间切分，并仅使用预测时刻已知的传感器与标签。此处 L2 是神经网络的示例；XGBoost 的正则项应按树模型定义。</p></article></div></div>
+       <div class="sec4"><div class="sn">02<span>WHY OPTIMIZATION</span></div><div class="sec4-body"><h2>为什么要多目标寻优？便宜的方案不一定安全</h2><p>井控约束决定可不可用，经济指标决定哪一个更值得推荐。配方质量、流变、环空压耗和药剂价格互相耦合；因此先筛掉越界候选，然后在安全集内最小化综合代价。这样才能避免“因为药剂便宜就允许井漏”的错误选择。</p>
+       <article class="math-card academic-math"><div class="card-head"><strong>多目标优化：加药成本 + 流变偏差 + 调整幅度</strong><span>FEASIBLE-FIRST MOO</span></div><div class="equation eq-multiline"><span>min&nbsp; <i>J</i>(<i>u</i>)</span><span>=</span><span><i>w</i><sub>1</sub> <i>C</i><sub>material</sub> + <i>w</i><sub>2</sub> <i>C</i><sub>rheology</sub> + <i>w</i><sub>3</sub> ‖Δ<i>u</i>‖<sup>2</sup></span></div><div class="math-constraint"><b>硬约束</b><span>ρ<sub>pore</sub>(<i>z</i>) + δ ≤ <i>ECD</i>(<i>z</i>,<i>u</i>) ≤ ρ<sub>fracture</sub>(<i>z</i>) − δ</span></div><p>如果用教学中的惩罚函数表示，也可以写成 <span class="math-inline">J<sub>soft</sub> = J + λ<sub>safety</sub> · Penalty<sub>ECD</sub></span>。但<b>惩罚再大仍可能产生越界最小值</b>，真正的候选推荐应先执行安全过滤；若无可行配方应回报“无可行解”。</p></article></div></div>
+       <div class="flow-lower academic-lower"><article class="code-card"><div class="code-head"><b>如何用代码“货比三家”</b><span>Python / 教学伪代码</span></div><pre><code><span class="cm"># 1. 对齐历史窗口，估计难以连续测量的井下状态</span>
+rho, mu = soft_sensor(pump_flow, standpipe_pressure,
+                      temperature, lab_history, lag_features)
+
+<span class="cm"># 2. 枚举候选：先判断安全，再比较成本</span>
+feasible = []
+for recipe in candidate_recipes:
+    curve = hydraulic_model(rho, mu, recipe, depths)
+    safe = all(pore[z] + margin &lt;= curve[z]
+               &lt;= fracture[z] - margin for z in depths)
+    <span class="hl">if not safe:</span>
+        continue  <span class="cm"># 越界方案直接淘汰</span>
+    cost = (material_cost(recipe)
+            + 0.4 * rheology_error(recipe)
+            + 0.2 * adjustment_cost(recipe))
+    feasible.append((cost, recipe))
+
+<span class="cm"># 3. 没有合规方案时不推荐，更不会自动下发</span>
+if not feasible:
+    show_warning("无安全可行解，请人工复核")
+else:
+    proposal = min(feasible, key=lambda item: item[0])[1]
+    <span class="hl">request_mud_engineer_approval(proposal)</span></code></pre></article>
+       <article class="flow-explain"><div class="eyebrow">TRANSLATE TO EVERYDAY LANGUAGE</div><h3>代码翻译成人话</h3><p><b>第一行：</b>把传感器看见的“表面现象”换算为井下密度、黏度的估计值。</p><p><b>第二段：</b>依次试算每份配方。像去超市比价一样，先把“不安全、不合规”的候选放回货架，只给剩下的方案算药剂费用和调整成本。</p><p><b>最后：</b>没找到安全方案就直接说“没有”，绝不为了给出答案而硬选一套。找到后仍只是<b>请泥浆工程师批准</b>，不是给加药设备发指令。</p><div class="callout"><b>AI 服务边界：</b>控制台的优化器使用教学密度/水力代理公式和网格枚举；没有真正训练 XGBoost，也没有自动操纵泵和阀。泥浆工程师的经验与现场化验仍是安全决策的必要依据。</div><div class="flow-checklist"><strong>工程师审核前检查</strong><span>① 压力窗口与井段裕度是否已确认？</span><span>② 加药配伍与流变性质是否可接受？</span><span>③ 化验、岩屑和返出流量是否支持建议？</span></div></article></div>
+    </section>
+
+    <section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+      <div class="eyebrow">03 / SOFT SENSING · CONSTRAINED RECIPE LAB</div><h2 class="section-title">井筒 ECD 窗口与智能配方实验台</h2><p class="lead">实线为假定 ECD 剖面，左右边界分别为孔隙与破裂当量密度。模拟自动钻遇高压盐水层后，<b>孔隙压力边界向右移动</b>；未经工程师授权，AI 仅推荐、不下发。加药效果有演示时间滞后；红色状态栏表示教学 ECD 越界，非真实井控诊断。</p>
+      <div class="statebar" id="statebar" role="status" aria-live="polite"><span class="state-dot"></span><strong id="state-title">正常循环：ECD 位于教学安全窗口</strong><span id="state-tag">NORMAL</span></div>
+      <div class="lab-grid">
+        <div class="lab-left">
+          <article class="card"><div class="card-head"><strong>井筒当量密度 ECD · 安全压力窗口</strong><span>密度当量 g/cm³ · 深度 m</span></div><svg id="ecd-chart" viewBox="0 0 830 364" role="img" aria-label="深度纵轴、当量密度横轴、孔隙压力下界、破裂压力上界和实时ECD曲线，含风险越界标记"></svg><div class="legend"><span><i class="sw jade"></i>当前 ECD</span><span><i class="sw clay dash"></i>孔隙压力下界</span><span><i class="sw red dash"></i>破裂压力上界</span><span><i class="sw green-bg"></i>安全窗口</span></div><p class="figcap"><b>图 2｜</b>井深方向的教学当量密度窗口，红色叉号表示 ECD 越界；安全窗口由孔隙/破裂压力当量密度构成，忽略了真实井控所需的非稳态压力、温压校正与复杂井身结构。</p></article>
+          <article class="card"><div class="card-head"><strong>软测量预测与稀疏化验校核</strong><span>井下密度估计 · g/cm³</span></div><svg id="soft-chart" viewBox="0 0 830 231" role="img" aria-label="横轴模拟时间，纵轴密度，比较井下合成真值、AI软测量预测与低频化验点"></svg><div class="legend"><span><i class="sw jade"></i>合成真值</span><span><i class="sw blue dash"></i>软测量预测</span><span><i class="sw clay-circle"></i>低频化验</span></div><p class="figcap"><b>图 3｜</b>模型连续估计井下密度，地面化验只间隔出现。合成“真值”仅用于说明监督误差，不是实际井下传感器观测。</p></article>
+          <article class="card micro-card" data-block="delay-diagnostics"><div class="card-head"><strong>AI 服务的三项证据</strong><span>SOFT SENSOR DIAGNOSTICS</span></div><div class="micro-grid"><div><small>循环延迟代理</small><b id="lag-val">—</b><span>min</span></div><div><small>软测量密度偏差</small><b id="err-val">—</b><span>g/cm³</span></div><div><small>表观黏度代理</small><b id="mu-val">—</b><span>mPa·s</span></div></div><div class="evidence-steps">
+   <div class="eyebrow">HOW THE ESTIMATE HELPS · 当前证据链</div>
+   <div class="evidence-step"><b>01 · 识别输入</b><span>联合入口排量、立压、温度与泵工况分析，不把停泵当作配方变化。</span></div>
+   <div class="evidence-step"><b>02 · 校核估计</b><span>稀疏化验点用于识别预测偏差；跨地层时需人工重新校准。</span></div>
+   <div class="evidence-step"><b>03 · 等待响应</b><span>估计变化不代表药剂已抵达井底，应结合时滞曲线和复测判断。</span></div>
+  </div>
+  <div class="mini-chart-title"><strong>指令目标与泥浆实际响应为何不同步？</strong><span>混配 / 环空滞后示意</span></div><svg id="lag-chart" viewBox="0 0 830 216" role="img" aria-label="横轴模拟时间，纵轴井底ECD，当下实际ECD曲线渐近到目标配方的预测值"></svg><div class="legend"><span><i class="sw jade"></i>实际 ECD</span><span><i class="sw blue dash"></i>本次指令目标 ECD</span></div><p class="figcap"><b>图 4｜</b>泥浆混配与循环使 ECD 渐近目标值。示范采用一阶惯性代理，不代表真实井下输送时间常数；实际加药应等待监测与复测后再评估。</p><p>这是带时滞、噪声和稀疏复测的教学数据流程；真实项目应给出预测区间与传感器质量门控。</p></article>
+        </div>
+        <div class="lab-right">
+          <article class="card metrics-card"><div class="card-head"><strong>井筒流体状态 / 软测量结果</strong><span>LIVE ESTIMATE</span></div><div class="metrics"><div><small>当前 ECD · 底部</small><b id="ecd-now">—</b><span>g/cm³</span></div><div><small>估计井下密度</small><b id="rho-now">—</b><span>g/cm³</span></div><div><small>入口排量</small><b id="flow-now">—</b><span>L/s</span></div><div><small>立管压力</small><b id="spp-now">—</b><span>MPa</span></div></div><div class="metrics-foot"><span>地层工况 <b id="formation-name">普通井段</b></span><span>模拟时刻 <b id="tick-now">T+0</b></span></div></article>
+          <article class="card ai-card" id="ai-card"><div class="card-head"><strong>AI 助手 · 多目标安全配方建议</strong><span>MOO RECOMMENDER</span></div><div class="ai-banner"><span class="ai-signal"></span><div><b id="ai-title">处于安全窗口，待人工审核</b><p id="ai-reason">AI 依据软测量和水力代理模型提供候选配方；不会自动修改现场设备。</p></div></div><div class="suggest-grid"><div><small>建议重晶石加量</small><b id="rec-b">1.5%</b></div><div><small>建议降滤失剂加量</small><b id="rec-f">0.8%</b></div><div><small>预测最低裕量</small><b id="rec-margin">—</b></div><div><small>预测代价 J*</small><b id="rec-cost">—</b></div></div><p class="ai-explain">安全优先：推荐前先筛掉所有违反 ECD 窗口的虚拟候选；再比较处理剂成本、流变偏差和调整幅度。</p></article>
+          <div class="handoff small-handoff" aria-label="机器建议必须由泥浆工程师审核才能执行"><span>机器：密度估计 + 安全配方</span><b>→ HUMAN 审核 →</b><span>泥浆工程师决定</span></div>
+          <article class="card decision-card"><div class="card-head"><strong>人工配方决策门</strong><span>HUMAN-IN-THE-LOOP</span></div><p>请结合返出岩屑粒径、筛网状态与现场化验，判断 AI 建议是否合理。<b>滑块只改变人工草案，点击授权后才进入模拟执行。</b></p><label for="barite">重晶石加量 <output id="barite-out">1.5%</output></label><input id="barite" type="range" min="0" max="4" step="0.1" value="1.5"><div class="ends"><span>0%</span><span>4.0%</span></div><label for="fluidloss">降滤失剂加量 <output id="fluidloss-out">0.8%</output></label><input id="fluidloss" type="range" min="0" max="2.5" step="0.1" value="0.8"><div class="ends"><span>0%</span><span>2.5%</span></div><div class="decision-actions"><button type="button" class="btn primary" id="accept-btn">采纳 AI 配方并授权模拟</button><button type="button" class="btn secondary" id="manual-btn">执行人工修正配方</button></div><div class="decision-text" id="decision-text">当前为观察模式；加药指令必须由泥浆工程师明确授权。</div><div class="dose-rail"><span>实际模拟重晶石 <b id="actual-b">—</b></span><span>实际模拟降滤失剂 <b id="actual-f">—</b></span></div></article>
+          <article class="card tools-card" data-block="scenario-tools"><div class="card-head"><strong>教学事件控制</strong><span>SCENARIO</span></div><div class="tools-row"><button type="button" class="btn ghost" id="salt-btn">模拟钻遇高压盐水层</button><button type="button" class="btn ghost" id="reset-btn">重置演示</button></div><p>自动运行数秒后也会触发高压层；可以提前手动触发。人工过量加重会显示井漏风险。<b>异常是教学判定，不代表真实井涌/井漏检测。</b></p></article>
+        </div>
+      </div>
+      <article class="card audit-card"><div class="card-head"><strong>泥浆工程师决策与效果回流</strong><span>FEEDBACK AUDIT · HUMAN → MODEL</span></div><ol id="audit-log" aria-live="polite"><li>等待工程师采纳或修改配方；日志会记录授权时刻、加量、风险判定与后续演示响应。</li></ol><div class="audit-bottom">已记录 <b id="log-count">0</b> 条人工反馈　·　软测量校正版本 <b id="model-version">v1</b></div></article>
+      <p class="safety-note">教学安全声明：井筒压力窗口、密度、配方加量、降滤失效果与优化目标全部为合成代理，不能用于真实井控、化学配方设计或自动加药。实际现场必须经泥浆/井控工程师核验。</p>
+    </section>
+  </main>
+  <footer><span>Petro × AI Atlas / 钻井液性能智能调控</span><span>Soft Sensing · Safe Optimization · Human-in-the-loop · d5</span></footer>
+</div>
+<script src="demo.js"></script>
+</body>
+</html>

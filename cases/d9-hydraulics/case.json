@@ -1,0 +1,169 @@
+{
+  "id": "d9-hydraulics",
+  "sceneId": "d9-hydraulics",
+  "stageId": "drilling",
+  "title": "钻井水力参数智能优化",
+  "version": "1.0.0",
+  "updated": "2026-11-03",
+  "methods": [
+    "ml",
+    "opt"
+  ],
+  "tabs": {
+    "background": {
+      "label": "专业背景",
+      "judge": [
+        {
+          "label": "数据形态",
+          "value": "水力多变量",
+          "desc": "排量、密度、PV/YP、TFA、泵压"
+        },
+        {
+          "label": "标注成本",
+          "value": "较高",
+          "desc": "水力试验、井下观测和设备校准"
+        },
+        {
+          "label": "可见收益",
+          "value": "安全内提升水功率",
+          "desc": "优化喷嘴和排量组合"
+        },
+        {
+          "label": "难度",
+          "value": "高",
+          "desc": "非牛顿流变、温压及多重约束"
+        }
+      ],
+      "lede": "钻头需要喷射能量来清洗井底，但高排量、缩小喷嘴会占用立管泵压预算。现场还必须管住设备额定功率、喷嘴射流速度与井底 ECD。AI 的价值在于快速评价大量候选而不是自动替工程师下达指令。",
+      "sections": [
+        {
+          "no": "01",
+          "en": "PROBLEM",
+          "title": "大排量为什么可能同时改善井底清洗和提高水力风险？",
+          "html": "<p>钻井泵的压力分配为 <strong>P<sub>pump</sub> = ΔP<sub>system</sub> + ΔP<sub>bit</sub></strong>。提高排量 Q 能增加喷射动量，但管柱、地面管线与环空流动损失也随之上升。井深、泥浆 PV/YP、钻具组合和喷嘴总面积 TFA 不断变化，单靠历史查表难以精确评价新工况。</p><p>地面泵压达标不代表井底 ECD 一定安全；两者必须独立校核。经典 <a href=\"https://doi.org/10.2118/8753-PA\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-8753-PA</a> 已讨论钻井水力优化中的泵设备可靠性与优化权衡。</p><figure><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 130\" role=\"img\" aria-label=\"泵压被分为系统压耗与钻头喷嘴压降，旁边需预留安全裕度\"><rect x=\"15\" y=\"25\" width=\"680\" height=\"75\" rx=\"7\" fill=\"#faf8f2\" stroke=\"#e9e4d8\"/><rect x=\"25\" y=\"40\" width=\"285\" height=\"46\" rx=\"3\" fill=\"#41699b\"/><rect x=\"310\" y=\"40\" width=\"245\" height=\"46\" fill=\"#2f7d6b\"/><rect x=\"555\" y=\"40\" width=\"129\" height=\"46\" fill=\"#f8ecdf\"/><text x=\"161\" y=\"69\" text-anchor=\"middle\" fill=\"white\" font-size=\"16\">系统压耗</text><text x=\"433\" y=\"69\" text-anchor=\"middle\" fill=\"white\" font-size=\"16\">喷嘴压降</text><text x=\"620\" y=\"69\" text-anchor=\"middle\" fill=\"#8e5229\" font-size=\"14\">安全裕度</text></svg><figcaption>图 1｜泵压预算示意；压力分配并不代表真实工况比例。</figcaption></figure>"
+        },
+        {
+          "no": "02",
+          "en": "INTERVENTION",
+          "title": "为什么是 MLP 代理模型与遗传算法 GA？",
+          "html": "<p><strong>MLP 代理模型</strong>从排量、密度、流变、喷嘴 TFA 和井深，回归预测系统压耗、喷嘴压降、井底水功率以及 ECD。高保真水力计算或试验作为训练标签，使多套方案可快速比较，但必须用实测持续校准。</p><p><strong>GA</strong>可同时搜索连续变量“排量”和离散变量“喷嘴规格”，先筛除超过泵压、泵轴功率、射流速度及 ECD 的方案，再优选水功率与变更成本。这里的优化是有硬约束的加权目标，不应声称自动求得全局最优或完整帕累托前沿。</p><div class=\"math-card\"><b>钻头喷嘴压降与水功率（SI）</b><p style=\"font-family:Cambria Math,Times New Roman,serif;font-size:21px;text-align:center\">ΔP<sub>bit</sub> = ρQ² / (2C<sub>d</sub>²A<sub>t</sub>²)</p><p style=\"font-family:Cambria Math,Times New Roman,serif;font-size:19px;text-align:center\">P<sub>bit,kW</sub> = ΔP<sub>bit,MPa</sub> · Q<sub>L/s</sub></p><p>Q 的原始计算单位是 m³/s；A<sub>t</sub> 为喷嘴总过流面积 m²，C<sub>d</sub> 为流量系数。1 MPa × 1 L/s = 1 kW。资料参考 <a href=\"https://doi.org/10.1504/IJOGCT.2022.123204\" target=\"_blank\" rel=\"noopener noreferrer\">2022 年钻头水功率约束优化论文</a>。</p></div>"
+        },
+        {
+          "no": "03",
+          "en": "DATA",
+          "title": "水力模型必须知道泵、泥浆、喷嘴与井身的全部关键条件",
+          "html": "<table class=\"dtable\"><thead><tr><th>数据组</th><th>典型变量</th><th>用途</th></tr></thead><tbody><tr><td>泵与管线</td><td>Q、立压、额定压力/功率、泵效率</td><td>确定硬安全预算</td></tr><tr><td>钻头喷嘴</td><td>喷嘴数、直径、总过流面积 TFA、C<sub>d</sub></td><td>计算喷嘴压降与射流速度</td></tr><tr><td>泥浆与井深</td><td>密度、PV、YP、温度、MD/TVD、井径</td><td>校准流变和环空压耗及 ECD</td></tr><tr><td>人工反馈</td><td>实测泵压、泵磨损、下趟喷嘴更换和异常原因</td><td>标记预测偏差并支持离线再训练</td></tr></tbody></table>"
+        },
+        {
+          "no": "04",
+          "en": "DIFFICULTY",
+          "title": "温压流变、模型外推与设备切换限制",
+          "html": "<p>非牛顿泥浆随温度、压力与固相含量变化，压耗与排量往往非线性耦合；喷嘴冲蚀、井下工具和环空偏心都会改变模型精度。未知工况下 MLP 可能低估压力，不能绕过独立工程校核。</p><div class=\"callout\"><b>Human-in-the-loop：</b>工程师必须审查地面管线承压、泵轴功率、井底 ECD 及喷嘴更换条件。喷嘴不是能在线远程改尺寸的电控阀门；案例中的喷嘴切换表示下一趟钻具组合的教学模拟。</div>"
+        }
+      ]
+    },
+    "workflow": {
+      "label": "案例流程",
+      "title": "水力代理预测 + GA 安全寻优 + 工程师授权",
+      "lead": "五步从传感器读数出发：先预测、再筛选、后授权；现场实测反馈用于下一轮离线校准，而非直接自动改写模型权重。",
+      "stats": [
+        [
+          "输入",
+          "泵压 / Q / ρ / TFA"
+        ],
+        [
+          "预测方法",
+          "MLP 水力代理"
+        ],
+        [
+          "搜索方法",
+          "GA + 硬安全约束"
+        ],
+        [
+          "最终决策",
+          "钻井工程师"
+        ]
+      ],
+      "steps": [
+        {
+          "name": "水力参数采集与工况质控",
+          "role": "SENSOR / DATA",
+          "do": "收集排量、泵压、PV/YP、密度、井深、喷嘴 TFA 和泵设备额定能力，并分离停泵与循环工况。",
+          "effect": "可信实时工况与安全限额。",
+          "trap": "不同井深/仪器状态的样本不能简单混拼。"
+        },
+        {
+          "name": "MLP 代理模型预测",
+          "role": "ML / SURROGATE",
+          "do": "从当前工况快速预测管柱环空系统压耗、钻头喷嘴压降、泵功率、ECD 与井底水功率。",
+          "effect": "不同参数方案可快速比较。",
+          "trap": "训练域外和新流变工况须回退机理计算。"
+        },
+        {
+          "name": "GA 多目标约束寻优",
+          "role": "OPT / GA",
+          "do": "生成排量和喷嘴的候选组合；泵压、射流速度、泵轴功率和 ECD 越限则立即剔除。",
+          "effect": "保留兼顾井底水功率与变更成本的可行方案。",
+          "trap": "GA 不保证全局最优，提交前要验证。"
+        },
+        {
+          "name": "钻井工程师审批",
+          "role": "HUMAN / AUTHORIZATION",
+          "do": "复核泵磨损、地面管线、井底 ECD 和下一趟喷嘴配置，选择 AI 方案或人工降排量。",
+          "effect": "形成明确的人类授权或否决记录。",
+          "trap": "网页模拟按钮不是现场设备控制接口。"
+        },
+        {
+          "name": "执行反馈与模型校准",
+          "role": "HUMAN → ML",
+          "do": "记录实际排量、喷嘴、压力、效果及人工判断；生成校准样本供离线再训练。",
+          "effect": "使后续水力预测更可解释。",
+          "trap": "审批日志不是实时神经网络训练。"
+        }
+      ],
+      "metrics": [
+        [
+          "井底水功率",
+          "钻头喷嘴压降 × 排量"
+        ],
+        [
+          "泵压裕度",
+          "安全上限 − 总立压"
+        ],
+        [
+          "喷嘴速度",
+          "排量 / TFA"
+        ],
+        [
+          "审计记录",
+          "人工批准、人工修正和异常"
+        ]
+      ],
+      "fails": [
+        {
+          "name": "泵压达标但井底 ECD 越界",
+          "why": "地面立压不能代替环空压力和破裂压力校核。"
+        },
+        {
+          "name": "代理模型在新泥浆流变下外推",
+          "why": "PV/YP、井温和固相变化，历史训练样本不足。"
+        },
+        {
+          "name": "喷嘴磨蚀或规格切换不现实",
+          "why": "喷嘴总面积变化影响水力分配，真实更换需按钻具计划进行。"
+        },
+        {
+          "name": "泵功率和管线强度受限",
+          "why": "即便喷嘴水功率较高，也不能突破泵轴功率/承压额定条件。"
+        }
+      ]
+    },
+    "demo": {
+      "label": "交互演示",
+      "mode": "auto",
+      "html": "demo/index.html",
+      "height": 680,
+      "intro": "交互式水力教学台：双轴压力/水功率曲线、喷嘴总面积示意、AI GA 候选、工程师授权和反馈日志。演示采用合成水力代理，不是实际训练好的 MLP。"
+    }
+  }
+}

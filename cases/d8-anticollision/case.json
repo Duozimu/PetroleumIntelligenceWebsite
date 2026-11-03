@@ -1,0 +1,158 @@
+{
+  "id": "d8-anticollision",
+  "sceneId": "d8-anticollision",
+  "stageId": "drilling",
+  "title": "邻井防碰与轨迹安全优化",
+  "version": "1.0.0",
+  "updated": "2026-11-03",
+  "methods": [
+    "ml",
+    "opt"
+  ],
+  "tabs": {
+    "background": {
+      "label": "专业背景",
+      "judge": [
+        {
+          "label": "数据形态",
+          "value": "MWD + 3D 轨迹",
+          "desc": "当前井、邻井、EOU、磁场 QC"
+        },
+        {
+          "label": "标注成本",
+          "value": "高",
+          "desc": "历史误差复测、真实碰撞极罕见"
+        },
+        {
+          "label": "可见收益",
+          "value": "可解释防碰",
+          "desc": "三维距离、风险概率与避让预演"
+        },
+        {
+          "label": "难度",
+          "value": "高",
+          "desc": "误差相关性与控制可执行性"
+        }
+      ],
+      "lede": "丛式井防碰不能仅凭两条二维线是否相交判定。先校核 MWD 和邻井资料，再通过误差建模、蒙特卡洛与前方约束优化获得可审核的候选轨迹；是否实施由定向工程师最终决定。",
+      "sections": [
+        {
+          "no": 1,
+          "en": "PROBLEM",
+          "title": "丛式井两条轨迹“看起来没撞”，为什么仍有风险？",
+          "html": "<p>高密度井组的当前井与邻井在地下可能相距仅数米。MWD 的井斜、方位和井深误差会随井段传播；磁干扰、邻井历史数据缺失及不同测量工具的准确度，使名义井眼不等于真实位置。EOU 并不是岩石中的井筒变粗，而是表示位置估计有不确定性。</p><p>传统防碰以三维中心井距和企业最低许可间距规则为基础，过于保守可能造成无谓避让，但如果没有工具级校准数据，盲目缩小 EOU 更危险。ISCWSA 提醒：单一分离规则本身不能保证足够低的撞井风险。</p><div class=\"figure\"><svg viewBox=\"0 0 720 220\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"两口丛式井俯视轨迹与不确定性椭圆\"><rect x=\"10\" y=\"12\" width=\"700\" height=\"194\" rx=\"7\" fill=\"#fdfcf9\" stroke=\"#e9e4d8\"/><g fill=\"#e6f1ec\" stroke=\"#2f7d6b\" stroke-dasharray=\"4 4\" opacity=\".7\"><ellipse cx=\"292\" cy=\"97\" rx=\"27\" ry=\"20\"/><ellipse cx=\"492\" cy=\"127\" rx=\"36\" ry=\"27\"/></g><g fill=\"#f9e9e5\" stroke=\"#b05a51\" stroke-dasharray=\"4 4\" opacity=\".7\"><ellipse cx=\"292\" cy=\"151\" rx=\"27\" ry=\"19\"/><ellipse cx=\"492\" cy=\"146\" rx=\"36\" ry=\"27\"/></g><path d=\"M45 62C230 55 345 112 675 168\" stroke=\"#2f7d6b\" stroke-width=\"4\" fill=\"none\"/><path d=\"M45 182C240 166 410 144 675 135\" stroke=\"#b05a51\" stroke-width=\"3.5\" fill=\"none\"/><path d=\"M492 127V146\" stroke=\"#41699b\" stroke-width=\"2\" stroke-dasharray=\"3 3\"/><text x=\"38\" y=\"37\" font-size=\"12\" fill=\"#235f51\">当前井</text><text x=\"38\" y=\"200\" font-size=\"12\" fill=\"#a24840\">邻井 A</text><text x=\"520\" y=\"33\" font-size=\"11\" fill=\"#79828a\">虚线椭圆：位置不确定性</text><text x=\"510\" y=\"106\" font-size=\"11\" fill=\"#41699b\">名义井距</text></svg></div><div class=\"figcap\">图 1｜井眼俯视投影与 EOU 示意。是否碰撞必须同时评估垂深差、井径、三维位置误差与轨迹形状。</div><p><b>参考资料：</b><a href=\"https://www.iscwsa.net/articles/collision-avoidance-calculations-current-common-practice/\" target=\"_blank\" rel=\"noopener noreferrer\">ISCWSA Collision Avoidance Calculations (2013)</a>；<a href=\"https://www.iscwsa.net/media/files/files/584292ba/02-stevesawaryn-collisionavoidancemgmtprinciples-spe184730-march-17.pdf\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-184730-MS</a>；<a href=\"https://link.springer.com/article/10.1007/s13202-020-00876-7\" target=\"_blank\" rel=\"noopener noreferrer\">Mansouri et al. (2020) 防碰轨迹优化</a>。</p>"
+        },
+        {
+          "no": 2,
+          "en": "INTERVENTION",
+          "title": "Why ML + Monte Carlo + MPC：纠正偏差、量化风险、提前避让",
+          "html": "<p>随机森林/XGBoost 可对历史复测偏差与磁场 QC 数据学习可验证的测斜残差校正，并与工具误差传播模型组合；机器学习无法代替现场测斜质控。Monte Carlo 从相对误差分布抽样成千上万个可能的井眼位置，计算前方 50 m 发生接触的比例，为工程师提供基于假设的风险证据。</p><p>轨迹优化参照 MPC 的多步预测思想，比较未来数段的方位控制，在井径、风险、狗腿度和转向平顺度约束内筛掉不可行解；只有定向工程师确认后才授权执行。没有可行候选，就应触发人工复核和测斜复测。</p><div class=\"math-card\" style=\"border:1px solid #e9e4d8;border-radius:8px;background:#fdfcf9;padding:16px 18px\"><div style=\"font:700 10px ui-monospace,monospace;color:#235f51\">SIMPLIFIED CLEARANCE & MONTE CARLO</div><p style=\"font:normal 24px/1.8 'Cambria Math','Times New Roman',serif;text-align:center;color:#235f51\">SF* = d<sub>cc</sub> / (r<sub>1</sub> + r<sub>2</sub> + k√(n<sup>T</sup>Σ<sub>rel</sub>n))</p><p style=\"font:normal 20px/1.8 'Cambria Math','Times New Roman',serif;text-align:center;color:#235f51\">P<sub>c</sub> ≈ (1/N)∑ I(d<sub>min</sub><sup>(s)</sup> ≤ r<sub>1</sub>+r<sub>2</sub>)</p><p style=\"color:#79828a;font-size:11.5px;line-height:1.8\">SF* 为教学方向投影简化分离指标；d<sub>cc</sub> 为三维井眼中心最近距离，Σ<sub>rel</sub> 为相对位置协方差，r 为井筒半径；第二式表示 Monte Carlo 的接触样本比例。两式都依赖误差与采样假设，不能当作场地统一安全标准。</p></div><p><b>三个指标不可混同：</b>俯视图上的二维靠近、三维中心距、由抽样估计的碰撞概率并非同一个数字。SF* 采用方向投影的简化教学定义；实际防碰报告应采用适用的公司/项目规则。</p>"
+        },
+        {
+          "no": 3,
+          "en": "DATA",
+          "title": "从测斜到邻井历史：需要一致坐标与可信工具误差",
+          "html": "<table class=\"dtable\"><thead><tr><th>数据类别</th><th>典型字段</th><th>用途</th></tr></thead><tbody><tr><td>当前井 MWD</td><td>MD、井斜、方位、测点与磁场 QC</td><td>构建三维中心轨迹与质控标识</td></tr><tr><td>误差模型</td><td>井深误差、工具零偏、磁参考与协方差</td><td>构建真实可信的 EOU / 相对误差</td></tr><tr><td>邻井数据库</td><td>历史测斜、井口坐标、井筒/套管直径、复测情况</td><td>相对距离与风险评估</td></tr><tr><td>工程限制</td><td>最小允许井距、DLS、BHA 控制能力</td><td>排除不可执行方案</td></tr><tr><td>人工反馈</td><td>采纳/拒绝、实钻与复测、审批备注</td><td>审计及模型校准标签</td></tr></tbody></table>"
+        },
+        {
+          "no": 4,
+          "en": "DIFFICULTY",
+          "title": "测斜相关性、非高斯干扰与“零事故样本”问题",
+          "html": "<p>井间可能存在共享的地磁参考误差，因此相对协方差不一定等于两井协方差简单相加。磁干扰还可能是有偏、非高斯和非平稳的，必须结合工具使用条件与 QC；训练集中极少出现真实碰撞，不适合只凭样本标签学习一个保证安全的黑盒分类器。</p><p>页面使用合成数据、高斯相对扰动、三维中心距及有限角度搜索。这里的 2σ、3% 风险线、SF* 阈值是教学数值，而非现场规则；即使 5000 次蒙特卡洛没有抽到碰撞，也不代表真正风险为零。</p><div class=\"callout\"><b>Human-in-the-loop：</b>定向工程师应联合防碰报告、磁测复核、井眼参数与现场管理制度做最后决策，保留执行与事后复核标签。</div><p>工具误差及适用限制参考 <a href=\"https://www.iscwsa.net/error-model-documentation/\" target=\"_blank\" rel=\"noopener noreferrer\">ISCWSA Error Model Revision 5</a>。</p>"
+        }
+      ]
+    },
+    "workflow": {
+      "label": "案例流程",
+      "title": "测斜质控 → 误差校正 → 概率预演 → 人工授权 → 效果复核",
+      "lead": [
+        "为什么用 AI：位置误差随深度与磁环境变化，人工静态扫描和固定误差包络难以同时兼顾效率与风险解释。",
+        "如何用 AI：用机器学习做可核查的残差估计、Monte Carlo 量化假设下的风险，用多步预测和硬约束筛选避让方位；安全流程不能跳过人的最终审批。"
+      ],
+      "stats": [
+        [
+          "感知输入",
+          "MWD / EOU"
+        ],
+        [
+          "风险评估",
+          "3D + Monte Carlo"
+        ],
+        [
+          "规划方式",
+          "50 m 候选搜索"
+        ],
+        [
+          "最终控制",
+          "Human approval"
+        ]
+      ],
+      "steps": [
+        {
+          "name": "MWD/邻井数据采集与质控",
+          "role": "SENSOR / QA",
+          "do": "读取当前井与邻井三维测点、磁场 QC、井径和工具误差模型，排查磁干扰与坐标不一致。",
+          "effect": "获取可信的三维轨迹与测量质量标识。",
+          "trap": "资料不可信时禁止直接缩小 EOU。"
+        },
+        {
+          "name": "残差校正与相对不确定性",
+          "role": "ML / ERROR",
+          "do": "用 XGBoost/随机森林学习可校验的测斜系统偏差，并与 ISCWSA 类误差模型及相关项组合。",
+          "effect": "输出更有依据的相对协方差与 EOU。",
+          "trap": "模型不能把未知误差当作“已经校正”。"
+        },
+        {
+          "name": "Monte Carlo 风险和约束寻优",
+          "role": "AI / MC + MPC",
+          "do": "模拟多种可能井眼位置；评估三维中心距、SF* 和接触样本比例，并筛选平顺可行避让。",
+          "effect": "提出未来50m推荐方位及不确定度证据。",
+          "trap": "抽样零次不等于真实概率绝对为零。"
+        },
+        {
+          "name": "定向工程师研判并授权",
+          "role": "HUMAN / REQUIRED",
+          "do": "核查邻井图纸、仪器 QC、企业防碰规则、狗腿度和可执行性，决定采纳或拒绝。",
+          "effect": "Human-in-the-loop：必须人类批准。",
+          "trap": "禁止把教学建议当作现场自动控制指令。"
+        },
+        {
+          "name": "执行记录与误差反馈回流",
+          "role": "HUMAN → MODEL",
+          "do": "对比授权前预测、实施轨迹与之后复测，记录拒绝原因、风险和离线标注。",
+          "effect": "形成可审计的复测和模型再训练样本。",
+          "trap": "同一条模拟预测路径不应冒充真实测量标签。"
+        }
+      ],
+      "metrics": {
+        "title": "如何评价防碰辅助 AI？",
+        "html": "<p>以经过复核的三维最低井距、风险估计的置信区间、企业 SF/MASD 条件、避让狗腿度、转向平顺度、复测一致性及人工误报拒绝率综合评价。必须报告误差模型适用域，并与 ISCWSA/公司程序对照。</p><p>教学伪代码：for action in candidate_angles: path=simulate_3d(action); pc=monte_carlo(path,covariance); if pc<=risk_limit and clearance_ok(path) and dls_ok(path): rank(action); request_human_approval(best)。</p>"
+      },
+      "fails": [
+        {
+          "name": "磁干扰使方向测量偏置",
+          "why": "高斯工具误差模型可能不再适用，应停钻或复测并按程序处理。"
+        },
+        {
+          "name": "邻井井口或测深基准混用",
+          "why": "中心距再精细也会基于错误的相对坐标。"
+        },
+        {
+          "name": "把 SF* 当成统一行业 SF 标准",
+          "why": "不同规则对误差投影和 MASD 定义不同，本指标只作课堂解释。"
+        },
+        {
+          "name": "风险概率被误当为绝对保证",
+          "why": "蒙特卡洛概率依赖假设和抽样量，零样本不能证明无碰撞风险。"
+        }
+      ]
+    },
+    "demo": {
+      "label": "交互演示",
+      "mode": "auto",
+      "html": "demo/index.html",
+      "height": 680,
+      "intro": "二维轨迹俯视 + 真实三维几何计算的教学模拟；EOU、SF*、MC 概率和 50m 避让候选联动。只有工程师点击授权后才修改轨迹。"
+    }
+  }
+}

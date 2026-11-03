@@ -1,0 +1,158 @@
+{
+  "id": "d6-hole-cleaning",
+  "sceneId": "d6-hole-cleaning",
+  "stageId": "drilling",
+  "title": "井眼清洁与岩屑运移优化",
+  "version": "1.1.0",
+  "updated": "2026-11-02",
+  "methods": [
+    "opt",
+    "ml"
+  ],
+  "tabs": {
+    "background": {
+      "label": "专业背景",
+      "judge": [
+        {
+          "label": "数据形态",
+          "value": "流固多源时序",
+          "desc": "流量、转速、泵压、岩屑及井斜"
+        },
+        {
+          "label": "标注成本",
+          "value": "高",
+          "desc": "岩屑床难以直接观测，需实验和代理标签"
+        },
+        {
+          "label": "可见收益",
+          "value": "少卡钻 · 控压",
+          "desc": "在限制压耗的条件下提升携岩效果"
+        },
+        {
+          "label": "难度",
+          "value": "高",
+          "desc": "多相流机理、未知工况及严苛安全边界"
+        }
+      ],
+      "lede": "高斜度井的岩屑会向井眼低侧沉积形成岩屑床，导致摩阻、扭矩、卡钻风险增加；单纯增大排量可能导致循环压耗与 ECD 越限。CFD/流动环路实验用来构建可信训练样本，代理模型快速预测候选方案，再由 PSO 在泵压和井底压力硬约束内搜索，最终交司钻审核。",
+      "sections": [
+        {
+          "no": 1,
+          "en": "PROBLEM",
+          "title": "岩屑床导致卡钻：经验大排量为什么也可能造成漏失？",
+          "html": "<p>大斜度、水平井中，岩屑在重力作用下滑落到环空低侧，沉积床可提高摩阻、扭矩和卡钻风险。单靠增排量可能提高携岩，却也推高泵压及井底 ECD，逼近地层破裂窗口。<b>这不是越冲越好的单目标问题，而是安全限制下的多目标权衡。</b></p><p>《Experimental Study of Cuttings Transport in Directional Wells》<a href=\"https://doi.org/10.2118/12123-PA\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-12123-PA（1986）</a>研究井斜、环空流速、流变和偏心；<a href=\"https://doi.org/10.2118/20421-MS\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-20421-MS（1990）</a>提出不同输运机制；<a href=\"https://doi.org/10.1016/j.petrol.2020.107136\" target=\"_blank\" rel=\"noopener noreferrer\">Busch &amp; Johansen（2020）</a>研究钻杆旋转、侧向运动与床面剪切。</p><div class=\"figure\"><svg viewBox=\"0 0 720 206\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"大斜度井环空岩屑床形成：上部环空钻井液携屑返出，下部重力沉降形成岩屑床；提高排量同时受泵压限制\"><rect width=\"720\" height=\"206\" fill=\"#fdfcf9\" rx=\"7\"/><path d=\"M32 38H688V167H32Z\" fill=\"#f5f2ea\" stroke=\"#c9c2b0\" stroke-width=\"2\"/><path d=\"M46 52H674V153H46Z\" fill=\"#e6f1ec\"/><path d=\"M46 139Q135 132 224 141T404 136T674 143V153H46Z\" fill=\"#b9a184\" stroke=\"#9b805e\"/><rect x=\"46\" y=\"86\" width=\"628\" height=\"30\" rx=\"15\" fill=\"#ced5d2\" stroke=\"#6e827b\" stroke-width=\"2\"/><path d=\"M94 67H555\" stroke=\"#2f7d6b\" stroke-width=\"3\"/><path d=\"M541 60l14 7-14 7\" fill=\"none\" stroke=\"#2f7d6b\" stroke-width=\"2\"/><g fill=\"#b26a39\"><circle cx=\"130\" cy=\"131\" r=\"5\"/><circle cx=\"212\" cy=\"130\" r=\"5\"/><circle cx=\"325\" cy=\"128\" r=\"6\"/><circle cx=\"453\" cy=\"129\" r=\"5\"/><circle cx=\"573\" cy=\"133\" r=\"5\"/></g><path d=\"M354 145L396 181\" stroke=\"#b26a39\" stroke-dasharray=\"4 3\"/><text x=\"403\" y=\"188\" font-size=\"12\" fill=\"#8e5229\">下侧岩屑床 · 沉积 / 再悬浮</text><text x=\"103\" y=\"28\" font-size=\"12\" fill=\"#235f51\">环空返流 → 携岩</text><text x=\"514\" y=\"28\" font-size=\"12\" fill=\"#4d565b\">大斜度 / 水平井段</text><text x=\"42\" y=\"199\" font-size=\"10.5\" fill=\"#79828a\">示意为轴向剖面；真实岩屑床分布由粒径、偏心度、流变、井斜、排量与旋转共同决定。</text></svg></div><div class=\"figcap\"><b>图 1｜</b>水平段岩屑沉降与液固两相输运概念：提高环空返速有助侵蚀岩屑床，但泵压、井底 ECD 与漏失边界同样必须被约束。</div>"
+        },
+        {
+          "no": 2,
+          "en": "INTERVENTION",
+          "title": "CFD 高保真离线计算，代理快速预测，PSO 约束寻优",
+          "html": "<p>CFD/CFD–DEM 建立流场与岩屑运动的高保真样本，但逐候选在线运行代价高。经试验校准后训练代理（神经网络、树模型等），将排量、转速、流变、井斜和粒径映射至床厚、岩屑浓度与环空压耗。<a href=\"https://doi.org/10.1002/ese3.70088\" target=\"_blank\" rel=\"noopener noreferrer\">2025 年 CFD 研究</a>验证了井眼偏心、排量和转速对携岩的共同影响。代理快速预测不意味着在任何硬件和模型上都固定 0.01 秒。</p><p>PSO 将每组排量/转速视为粒子，在个体和群体较优点之间迭代搜索，必须先做泵压、ECD、设备范围硬过滤。PSO 不保证全局最优；需要可行域校验、模型不确定性与司钻授权。原始 PSO 算法参见 <a href=\"https://doi.org/10.1109/ICNN.1995.488968\" target=\"_blank\" rel=\"noopener noreferrer\">Kennedy &amp; Eberhart（1995）</a>。</p><div class=\"math-card\" style=\"padding:16px;border:1px solid #e9e4d8;border-radius:8px;background:#fdfcf9\"><div style=\"font:bold 11px system-ui;color:#235f51\">CONSTRAINED MULTI-OBJECTIVE OPTIMIZATION</div><div style=\"text-align:center;font:normal 20px/2 Cambria Math,Times New Roman,serif;color:#235f51\">min J = w₁·H̄_bed + w₂·ΔP̄_ann + w₃·R_change</div><div style=\"text-align:center;font:normal 17px/1.7 Cambria Math,Times New Roman,serif\">s.t. P_pump ≤ P_limit，ECD_pore + m ≤ ECD ≤ ECD_fracture − m</div><p>横线表示无量纲化；硬约束不被低成本或高携岩性能抵消。越界候选直接作废。</p></div>"
+        },
+        {
+          "no": 3,
+          "en": "DATA",
+          "title": "轨迹、流变、固相、压力与人工反馈必须一起采",
+          "html": "<p>按井段、时间与工况同步数据，并将循环洗井与继续钻进区别标注。岩屑床厚度通常缺少井下直接真值，可结合 CFD、流动环路实验、扭矩拖曳与固控返砂数据交叉校准。</p><table class=\"dtable\"><thead><tr><th>数据类别</th><th>关键字段</th><th>工程作用</th></tr></thead><tbody><tr><td>井眼几何/轨迹</td><td>井斜、井径、钻杆外径、偏心度、井深</td><td>环空截面积与低侧沉积判断</td></tr><tr><td>循环/机械</td><td>排量 L/s、转速 rpm、泵压 MPa、扭矩、ROP</td><td>携岩与水力限制、工况门控</td></tr><tr><td>泥浆流变</td><td>密度、塑性黏度 PV、屈服值 YP、温度</td><td>非牛顿输运与压力损失</td></tr><tr><td>颗粒/台账</td><td>岩屑粒径/密度、返砂、扫浆、漏失事件</td><td>沉降/迁移证据、风险标签</td></tr><tr><td>人工决策</td><td>采纳/微调原因、循环时长、返砂复核</td><td>Human-in-the-loop 审计与模型更新</td></tr></tbody></table><p>参考 <a href=\"https://doi.org/10.2118/201709-MS\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-201709-MS</a> 的非牛顿流体倾斜环空可视化与测量方法，应把岩屑粒径、流变、井斜、转速和时间同步，并对 CFD 数据做井段外验证。</p>"
+        },
+        {
+          "no": 4,
+          "en": "DIFFICULTY",
+          "title": "多相流强耦合、未知地层外推与“安全第一”的执行边界",
+          "html": "<p><b>机理复杂：</b>颗粒尺寸和形状不一，流体剪切变稀、钻杆偏心及旋转共同影响局部返速和床面剪切；岩屑可能沉降、滚动、跃移、再悬浮或形成固结床。单一平均环空流速不能完全表征局部床面状态。</p><p><b>模型风险：</b>CFD 代理模型对训练分布之外的井径、地层、颗粒分布和流变配方可能失准。应按井段外验证，并对泵压预测误差留裕量。<b>安全边界：</b>泵压上限不是井漏的充分判据，还必须同时监控 ECD、地层破裂压力、泵设备额定值和井控状态。</p><div class=\"callout warn\"><b>教学边界：</b>本示范使用手工构造的简化水力—清洁代理，不是真正训练出的 CFD 网络，PSO 为页面上的小规模模拟。所有数值、清洁效率和 80% 改善仅用于交互教学，不能直接用于现场指令。</div><p>真实井段仍应独立核算 ECD、破裂压力裕度及设备额定值。在线代理预测的可信域之外必须人工接管；本示范仅为教学合成模型，不是 CFD 网络部署。</p>"
+        }
+      ]
+    },
+    "workflow": {
+      "label": "案例流程",
+      "title": "从井下流固响应到司钻授权的五步闭环",
+      "lead": [
+        "为什么不用在线逐套 CFD？因为反复求解流固多相流计算成本高；代理模型把离线 CFD/试验经验压缩成快速预测器。为什么用 PSO？因为多参数响应复杂且未必凸，粒子群可快速探索候选，但必须先通过泵压、ECD 硬安全筛查。",
+        "五步闭环：采数据 → 离线 CFD/试验与在线代理 → PSO 搜索 → 司钻安全授权 → 清理效果/返砂反馈。"
+      ],
+      "stats": [
+        [
+          "数据特征",
+          "流固耦合"
+        ],
+        [
+          "模型形式",
+          "CFD → 代理"
+        ],
+        [
+          "寻优方法",
+          "PSO / MOO"
+        ],
+        [
+          "控制权",
+          "司钻授权"
+        ]
+      ],
+      "steps": [
+        {
+          "name": "多源数据采集",
+          "role": "SENSOR / DATA",
+          "do": "同步井斜、井眼尺寸、排量、转速、泥浆 PV/YP、泵压及岩屑返出；分离钻进和循环洗井状态。",
+          "effect": "得到可信的当前井况向量与安全边界。",
+          "trap": "未分离泵停/接单根，会产生伪“岩屑床堆积”。"
+        },
+        {
+          "name": "CFD 代理模型预测",
+          "role": "AI / SURROGATE",
+          "do": "离线以 CFD/试验样本训练床厚/压耗代理，线上快速估计排量、RPM、流变变化后的结果；页面运行机理启发的合成代理。",
+          "effect": "把耗时多物理场计算变成可快速扫描的响应预测。",
+          "trap": "代理速度由模型、硬件和批量大小决定，不能宣称固定 0.01 秒；离开训练域可能失准。"
+        },
+        {
+          "name": "PSO 安全约束优化",
+          "role": "OPT / PSO",
+          "do": "粒子群探索排量/转速，先按泵压、ECD、设备额定值过滤候选；仅对合规候选计算归一化床厚+压耗+调参代价。",
+          "effect": "得到泵压/ECD 可行域内的最优候选和约束裕度（非全局最优保证）。",
+          "trap": "不能用加权处罚替代工程硬约束。"
+        },
+        {
+          "name": "司钻参数审核与授权",
+          "role": "HUMAN / REQUIRED",
+          "do": "司钻观察岩屑筛返出、扭矩摩阻、井壁/漏失风险，决定采纳、微调或追加循环 10 分钟；所有按钮只驱动教学模拟。",
+          "effect": "Human-in-the-loop：人工决定是否下发。",
+          "trap": "计算最优点未必是现场最安全的动作。"
+        },
+        {
+          "name": "执行效果与反馈回流",
+          "role": "HUMAN → MODEL",
+          "do": "对比预测床厚与返出变化，记录授权参数、循环时长、泵压和异常理由。",
+          "effect": "形成可审计标签，校准代理及下次优化边界。",
+          "trap": "没有实测验证时不得把模拟效果当成真实标签。"
+        }
+      ],
+      "metrics": {
+        "title": "怎么证明算法真的有用",
+        "html": "<p><b>目标函数：</b>min J=w₁ H̄_bed+w₂ ΔP̄_ann+w₃ R_change，满足 P_pump≤P_limit 和 ECD_pore+m≤ECD≤ECD_fracture−m。<b>伪代码翻译：</b>对每个候选先检查 if feasible；若违反硬约束就赋正无穷成本、直接剔除，否则比较清洁效率与水力代价。没有可行解时必须交人工，不自动下发。</p><p>评价包括预测床高 MAE、压耗 RMSE、压力越界率、清洁效率和现场采纳率，按井段外验证；参考 <a href=\"https://doi.org/10.2118/12123-PA\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-12123-PA</a>、<a href=\"https://doi.org/10.2118/201709-MS\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-201709-MS</a> 和 <a href=\"https://doi.org/10.1109/ICNN.1995.488968\" target=\"_blank\" rel=\"noopener noreferrer\">PSO 原始论文</a>。</p>"
+      },
+      "fails": [
+        {
+          "name": "代理模型外推失真",
+          "why": "新井眼尺寸、流变或岩屑粒度远离训练域，清洁预测可能高估。"
+        },
+        {
+          "name": "泵压安全但 ECD 越限",
+          "why": "地面泵压与井底压力不是同一约束，仍需独立井底压力窗口。"
+        },
+        {
+          "name": "人工强行提高排量",
+          "why": "可能提升携岩却使水力安全裕度消失，应告警并停用自动优化。"
+        },
+        {
+          "name": "返砂反馈存在延迟",
+          "why": "筛上岩屑流量滞后于井底清洁变化，必须时间对齐后校正模型。"
+        }
+      ]
+    },
+    "demo": {
+      "mode": "auto",
+      "html": "demo/index.html",
+      "height": 680,
+      "label": "可运行示范",
+      "intro": "三个内嵌 Tab 展示岩屑床 CFD 机理、PSO 硬约束筛选与司钻授权。滑块为人工候选预览，若越过压力边界则红色提示并暂停 AI 采纳，待恢复安全草案后才可授权。"
+    }
+  }
+}

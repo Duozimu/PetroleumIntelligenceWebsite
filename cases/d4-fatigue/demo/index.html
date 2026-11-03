@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="钻具失效预测：Miner 疲劳损伤约束、振动时序、剩余寿命与司钻人工决策。">
+<title>钻具失效预测 · Petro × AI Atlas</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="site-wrap">
+<header class="doc-head">
+  <nav class="crumb" aria-label="页面层级"><span>总览</span><i>/</i><span>作业链</span><i>/</i><span>钻井</span><i>/</i><strong>钻具失效预测</strong></nav>
+  <div class="dh-kicker"><span class="tag">环节 03 · 钻井</span><span class="tag tag-tech">PINN 物理约束网络</span><span class="tag tag-method">TS 时序预测</span><span class="tag tag-case"><span class="tiny-dot"></span>案例 d4-fatigue · v1.1.0</span></div>
+  <h1 class="dh-title">钻具失效预测</h1>
+  <p class="dh-sub">钻柱在高狗腿度井段持续旋转，螺纹、接头等应力集中处可能因变幅载荷累积疲劳损伤。单凭断裂样本难以训练可靠寿命模型；因此结合 <b>高频振动时序特征、S–N 材料曲线和 Miner 损伤约束</b>，由工程师最终决定检查或起钻。</p>
+  <div class="dh-tags"><span class="dtag" data-d="高">● 难度 高</span><span class="tag">D4</span><span class="tag subtler">Physics-informed · RUL · Human-in-the-loop</span></div>
+</header>
+<nav class="tabs" role="tablist" aria-label="三大板块">
+  <button type="button" class="tab on" data-tab="bg" role="tab" id="tab-bg" aria-controls="panel-bg" aria-selected="true"><span>01</span> 专业背景</button>
+  <button type="button" class="tab" data-tab="flow" role="tab" id="tab-flow" aria-controls="panel-flow" aria-selected="false"><span>02</span> 案例流程</button>
+  <button type="button" class="tab" data-tab="demo" role="tab" id="tab-demo" aria-controls="panel-demo" aria-selected="false"><span>03</span> 交互演示</button>
+</nav>
+<main>
+<section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+  <div class="judge"><div><small>数据形态</small><strong>高频振动 + 轨迹</strong><span>三轴加速度 / 高速扭矩 / DLS</span></div><div><small>标注成本</small><strong>极高</strong><span>断裂稀少，探伤和删失多</span></div><div><small>可见收益</small><strong>检修前置</strong><span>识别高载荷井段疲劳消耗</span></div><div><small>技术难度</small><strong>高</strong><span>应力反演与跨地层漂移</span></div></div>
+  <div class="intro"><div class="eyebrow">ENGINEERING BACKGROUND · WHY AI WORKS</div><p>在硬地层、高狗腿度和强烈井壁接触工况下，粘滑、横向涡动、旋转弯曲和屈曲会造成复杂的变幅载荷。SPE-145910-MS 报告了沿钻柱分布的动态测量与实际疲劳故障之间的关联。<b>AI 的任务并非凭少量断裂记录“猜寿命”，而是把高频观测与可校准的疲劳物理规律结合，形成供工程师核实的风险证据。</b></p></div>
+  <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec4-body"><h2>钻具为何可能在几小时剧烈振动后迅速累积疲劳？</h2>
+  <p>钻柱在井下同时受到轴向拉伸或局部受压、扭转、弯曲和冲击：钻头间歇停转再突然加速形成<b>粘滑振动（Stick–Slip）</b>，伴随扭矩及瞬时转速剧烈变化；<b>涡动（Whirl）</b>使钻具偏心运动并反复撞击井壁；受压井段还可能出现<b>屈曲变形</b>。在坚硬地层和高狗腿度（DLS）井段，旋转中的弯曲杆体表面反复承受拉—压交替应力，接头螺纹根部和加厚过渡区的应力集中更值得关注。</p>
+  <p>现场为控制起下钻及更换成本，可能参考<b>纯钻进时间或累计进尺</b>制定检查计划。可同样进尺的两个井段，严重粘滑、涡动与大 DLS 导致的应力幅和循环数差别很大；短时高幅循环可能比长时间平稳旋转消耗更多疲劳寿命。<b>仅按固定周期换钻具，既可能过度检修，也可能错过危险窗口。参见 <a class="academic-ref" href="https://onepetro.org/SPEATCE/proceedings-abstract/11ATCE/11ATCE/SPE-145910-MS/148399" target="_blank" rel="noopener noreferrer">SPE-145910-MS：Drill Pipe Dynamic Measurements Provide Valuable Insight Into Drill String Dysfunctions</a>；<a class="academic-ref" href="https://onepetro.org/JPT/article-abstract/13/02/175/162288/Maximum-Permissible-Dog-Legs-in-Rotary-Boreholes" target="_blank" rel="noopener noreferrer">1961 年井眼狗腿度与疲劳研究</a>。</b></p>
+
+    <figure class="paper-figure">
+      <div class="figure-head"><b>弯曲井眼内旋转钻柱：拉压交变、狗腿度与局部疲劳</b><span>DOGLEG · ROTATING BENDING · FATIGUE</span></div>
+      <svg viewBox="0 0 900 392" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="井眼由直线过渡到狗腿弯曲，钻具沿弯曲井眼旋转，受到轴向拉伸、局部压缩、弯曲和旋转扭矩作用，外侧及内侧纤维周期交替受拉受压，危险部位可能萌生疲劳裂纹">
+        <defs>
+          <marker id="d4arrClay" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M1 1 L8 4 L1 7" fill="none" stroke="#b26a39" stroke-width="1.5"/></marker>
+          <marker id="d4arrJade" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M1 1 L8 4 L1 7" fill="none" stroke="#2f7d6b" stroke-width="1.5"/></marker>
+          <marker id="d4arrRed" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M1 1 L8 4 L1 7" fill="none" stroke="#b05a51" stroke-width="1.5"/></marker>
+        </defs>
+        <rect x="18" y="18" width="864" height="354" rx="6" fill="#fdfcf9" stroke="#e9e4d8"/>
+        <g stroke="#f0ede6" stroke-width="1"><path d="M38 84H860M38 164H860M38 244H860M38 324H860" stroke-dasharray="3 7"/></g>
+        <text x="43" y="48" fill="#4d565b" font-size="13" font-weight="600">井眼轴线偏转与旋转弯曲应力</text>
+        <text x="850" y="49" fill="#79828a" font-size="10.5" text-anchor="end">二维剖面 · 仅示意受力趋势，非比例图</text>
+        <path d="M62 87 C246 86 284 153 427 187 S650 266 822 263 L822 328 C650 331 535 264 427 249 S246 150 62 150 Z" fill="#f1ede5" opacity=".88"/>
+        <path d="M62 87 C246 86 284 153 427 187 S650 266 822 263" fill="none" stroke="#cbbfac" stroke-width="3"/>
+        <path d="M62 150 C246 150 284 214 427 249 S650 331 822 328" fill="none" stroke="#cbbfac" stroke-width="3"/>
+        <path d="M62 118 C246 118 284 184 427 218 S650 299 822 296" fill="none" stroke="#8b938d" stroke-width="1.6" stroke-dasharray="7 5"/>
+        <path d="M62 105 C246 105 284 171 427 205 S650 286 822 283 L822 309 C650 312 535 245 427 231 S246 131 62 131 Z" fill="#e6f1ec" stroke="#2f7d6b" stroke-width="2.4"/>
+        <path d="M62 117 C246 117 284 183 427 218 S650 298 822 296" fill="none" stroke="#679f90" stroke-width="1.4" stroke-dasharray="3 6"/>
+        <path d="M363 180 l19 -10 14 17 10 -10 12 18" stroke="#b05a51" stroke-width="3.4" fill="none"/>
+        <circle cx="388" cy="186" r="22" stroke="#b05a51" fill="none" stroke-dasharray="4 4"/>
+        <path d="M402 173L496 105" stroke="#b05a51" stroke-dasharray="5 5" fill="none"/>
+        <rect x="476" y="64" width="244" height="80" rx="6" fill="#fff" stroke="#e9e4d8"/>
+        <text x="490" y="86" fill="#b05a51" font-size="12.5" font-weight="600">危险部位：接头/螺纹根部</text>
+        <text x="490" y="105" fill="#4d565b" font-size="11.5">几何突变使循环应力集中</text>
+        <text x="490" y="125" fill="#79828a" font-size="10.5">裂纹萌生 → 扩展 → 完整性风险</text>
+        <path d="M150 77H80" stroke="#2f7d6b" stroke-width="2.5" marker-end="url(#d4arrJade)"/>
+        <text x="82" y="66" fill="#235f51" font-size="12.5">轴向拉力 T（示意）</text>
+        <path d="M595 335L637 343" stroke="#b26a39" stroke-width="2.3" marker-end="url(#d4arrClay)"/>
+        <path d="M737 348L689 345" stroke="#b26a39" stroke-width="2.3" marker-end="url(#d4arrClay)"/>
+        <text x="652" y="366" fill="#8e5229" font-size="11.5">局部轴向受压 / 屈曲风险</text>
+        <path d="M258 121Q305 85 341 128" fill="none" stroke="#b26a39" stroke-width="2.2" marker-end="url(#d4arrClay)"/>
+        <text x="267" y="83" fill="#8e5229" font-size="12.5">转动及扭矩波动 T(t)</text>
+        <path d="M321 224Q351 244 377 240" fill="none" stroke="#b05a51" stroke-width="2.1" marker-end="url(#d4arrRed)"/>
+        <text x="260" y="273" fill="#b05a51" font-size="12">狗腿区旋转弯曲 M<tspan baseline-shift="sub" font-size="9">b</tspan></text>
+        <text x="260" y="290" fill="#79828a" font-size="10.5">外/内侧纤维随旋转周期交替拉压</text>
+        <text x="66" y="213" fill="#4d565b" font-size="11.5">曲率较小井段</text>
+        <text x="672" y="244" fill="#b05a51" font-size="11.5">DLS 较大区域</text>
+        <rect x="41" y="326" width="507" height="35" rx="5" fill="#fff" stroke="#e9e4d8"/>
+        <path d="M56 343H86" stroke="#2f7d6b" stroke-width="3"/>
+        <text x="91" y="347" fill="#4d565b" font-size="10.5">钻具</text>
+        <path d="M153 343H183" stroke="#cbbfac" stroke-width="4"/>
+        <text x="188" y="347" fill="#4d565b" font-size="10.5">井壁</text>
+        <path d="M260 343H290" stroke="#b26a39" stroke-width="3"/>
+        <text x="295" y="347" fill="#4d565b" font-size="10.5">载荷/扭转</text>
+        <path d="M407 343H437" stroke="#b05a51" stroke-width="3"/>
+        <text x="442" y="347" fill="#4d565b" font-size="10.5">应力集中</text>
+      </svg>
+      <figcaption><b>图 1｜</b>弯曲井眼中的钻柱旋转使危险截面承受周期性弯曲应力；狗腿度 DLS 较大时须重点评估曲率、轴向载荷与接触作用。图中拉、压状态代表不同局部工况，并非表示同一截面同时承受相反净轴力。</figcaption>
+    </figure>
+
+  </div></div>
+  <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec4-body"><h2>为何不是纯 LSTM，而是“振动特征 + S–N / Miner”混合模型？</h2>
+  <p>断钻具是极端稀缺事件，很多钻具会在失效前被预防性起钻，因此真实断裂时刻不可见，不能把“未断”当作“寿命还很长”。LSTM 或 1D-CNN 能从高频三轴加速度、扭振/扭矩序列中提取周期振动、粘滑波动、冲击及涡动特征，但<b>仅凭网络很难在少量断裂样本上稳定学习应力—寿命规律。<b>这并不意味着纯数据模型绝对不能用，而是它的外推、校准和少样本可靠性往往不足以独立支持高后果工程决策。</b></b></p>
+  <p>工程融合链条为：<b>高频振动与动力学传感器 → 经几何和受力标定估计危险截面应力时程 → 雨流计数提取循环 → 由材料或接头 S–N 曲线确定寿命容量 → Miner 损伤累加</b>。网络负责提取时序信息并预测损伤趋势/RUL，物理一致性损失约束结果符合疲劳累加趋势；加速度本身并不等于材料应力，应先完成传感器到载荷/应力的标定与模型映射。</p>
+  <div class="contrast-intro"><b>为什么传统经验和纯 LSTM 各有盲区？</b><div class="method-contrast">
+    <div><strong>固定周期 / 进尺换具</strong><span>易理解、便于执行</span><p>同样钻进 100 m，低振动与强烈涡动的疲劳消耗可能完全不同；仅看时间难以反映载荷谱。</p></div>
+    <div><strong>纯 LSTM 拟合断裂标签</strong><span>能捕捉时序，但依赖样本</span><p>断裂事件稀少，大量预防性更换是右删失，网络可能把“尚未断”错学为“足够安全”。</p></div>
+    <div class="preferred"><strong>物理引导时序模型</strong><span>数据负责识别，机理负责约束</span><p>1D-CNN / LSTM 读振动与工况；标定后的应力谱经 S–N 与 Miner 给出损伤参考，再以损失函数惩罚明显违背疲劳规律的输出。</p></div>
+    </div></div>
+  <div class="callout"><b>“给 AI 请一位物理老师”：</b>真实断裂样本很少，不足以让模型单凭标签掌握所有疲劳模式。S–N 曲线像材料的“寿命课本”，Miner 累积像“疲劳记账本”；网络学习看不清的振动与工况变化，物理参考约束它别胡乱推断。这里只实现 <b>physics-informed loss</b> 的教学框架，不是从 PDE 出发求解完整钻柱动力学的严格 PINN。</div>
+  <p class="research-note">研究依据：<a class="academic-ref" href="https://onepetro.org/SPEDC/proceedings-abstract/25DC/25DC/D021S016R002/642543" target="_blank" rel="noopener noreferrer">SPE-223731-MS（2025，钻杆全尺寸疲劳试验与累积损伤评估）</a>；<a class="academic-ref" href="https://www.sciencedirect.com/science/article/pii/S0021999118307125" target="_blank" rel="noopener noreferrer">Raissi 等（2019），Physics-informed neural networks</a>。</p>
+  <div class="math-card"><div class="math-eyebrow">MINER'S RULE · LINEAR CUMULATIVE DAMAGE</div>
+    <div class="math-equation" role="math" aria-label="D 等于从 i 等于一到 k 求和 n_i 除以 N_i"><span class="math-var">D</span><span class="operator">=</span><span class="sum-symbol">∑<span class="sum-upper">k</span><span class="sum-lower">i=1</span></span><span class="fraction"><span>n<sub>i</sub></span><span>N<sub>i</sub></span></span><span class="eq-result">D ≥ 1 · 模型疲劳临界</span></div>
+    <div class="math-terms"><div><b>n<sub>i</sub></b><span>某一交变应力水平下实际经历的循环次数，通过应力时程和循环计数估计</span></div><div><b>N<sub>i</sub></b><span>同一应力幅值下，材料/接头由 S–N 曲线给出的临界循环容量</span></div><div><b>D</b><span>各应力水平损伤比的累加，无量纲；达到模型临界需人工处置</span></div></div>
+    <p><b>工程解释：</b>第 i 档交变应力在服役期间经历 n<sub>i</sub> 次，若单独施加该应力的疲劳寿命容量是 N<sub>i</sub> 次，则该档贡献 n<sub>i</sub>/N<sub>i</sub>。所有档位相加得 D。<b>经典 Miner 在 D ≥ 1 时判为理想化疲劳失效临界</b>；教学模拟据此停止，但真实钻具可能更早或更晚出现裂纹、洗穿或断裂，须按现场规程提前检查并由工程师决定起钻。</p>
+  </div>
+  <div class="callout"><b>AI 如何服务现场：</b>AI 将异常振动、井眼曲率、危险截面应力代理和累积损伤联合解释为“为何接近风险”，向工程师建议检查或起钻；模型不自动下发任何现场操作，人工审查及探伤结果会形成高价值标签。</div>
+  </div></div>
+  <div class="reference-panel" aria-label="参考资料">
+    <h3>工程与算法文献 · 可点击原始出处</h3>
+    <div class="reference-grid">
+      <a class="reference-item" href="https://www.api.org/products-and-services/standards/digital-catalog" target="_blank" rel="noopener noreferrer"><b>API RP 7G / API Spec 5DP</b><span>钻柱设计、运行限制与钻杆产品规范。API 标准不是本案例 D=0.80 教学阈值的来源。</span></a>
+      <a class="reference-item" href="https://onepetro.org/SPEATCE/proceedings-abstract/11ATCE/11ATCE/SPE-145910-MS/148399" target="_blank" rel="noopener noreferrer"><b>SPE-145910-MS（2011）</b><span>沿钻柱动态监测揭示局部横向振动、扭矩异常与疲劳故障关联。</span></a>
+      <a class="reference-item" href="https://onepetro.org/SPEDC/proceedings-abstract/25DC/25DC/D021S016R002/642543" target="_blank" rel="noopener noreferrer"><b>SPE-223731-MS（2025）</b><span>全尺寸钻杆疲劳试验、循环寿命与累积损伤评估。</span></a>
+      <a class="reference-item" href="https://doi.org/10.1016/j.jcp.2018.10.045" target="_blank" rel="noopener noreferrer"><b>Raissi et al.（2019）</b><span>物理信息神经网络的基础框架；本文借鉴损失层物理约束思想。</span></a>
+      <a class="reference-item" href="https://www.mdpi.com/2075-4701/11/2/204" target="_blank" rel="noopener noreferrer"><b>Metals（2021）：累积疲劳损伤综述</b><span>介绍 Miner 线性累积假设及载荷顺序等适用性局限。</span></a>
+    </div>
+  </div>
+  <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec4-body"><h2>疲劳预测要把三轴振动、狗腿度与钻具全生命周期关联</h2>
+  <table class="dtable"><thead><tr><th>数据源</th><th>核心字段</th><th>工程作用</th></tr></thead><tbody>
+  <tr><td>高频动态监测</td><td>三轴加速度、扭转振动、高频扭矩、冲击特征</td><td>识别粘滑/涡动、估算变幅载荷与循环谱；记录采样频率与校准</td></tr>
+  <tr><td>井眼轨迹</td><td>井深、井斜角、方位角、狗腿度 DLS</td><td>刻画井眼曲率，辅助估算旋转弯曲应力及接触载荷</td></tr>
+  <tr><td>钻井工况</td><td>RPM、WOB、轴向载荷、扭矩、钻进/停钻状态</td><td>构建应力幅与均值，并识别运行模式切换</td></tr>
+  <tr><td>钻具台账</td><td>钻杆、接头材质、钢级、尺寸、S–N 参数、累积服役史</td><td>为每根钻具分配材料寿命容量和损伤起始值</td></tr>
+  <tr><td>检查与结果</td><td>探伤、裂纹、洗穿/断裂、检修与司钻/工程师判断</td><td>验证损伤、右删失处理、误报/漏报及反馈学习</td></tr>
+  </tbody></table>
+  <p class="hint">工程注意：振动测点可能位于 BHA，而损伤热点却在钻杆接头；必须考虑空间传递、动态载荷反演和接头应力集中系数。大 DLS 会影响弯曲应力，但并非可以直接代入 Miner 公式的应力幅值。</p>
+  </div></div>
+  <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec4-body"><h2>高噪声、强漂移和稀缺断裂标签共同限制可靠性</h2>
+  <p><b>信号噪声：</b>破岩冲击、井壁碰撞、泥浆流动、局部共振与真实损伤相关的扭转/弯曲振动混叠。直接低通滤波可能损失关键高频信息；需结合转速与工况门控、时频特征、传感器频响标定及物理校核。<b>环境漂移：</b>井深、地层软硬交错、DLS、钻头磨损、钻具组合及腐蚀条件变化，会改变正常振动基线与 S–N 的有效容量，需要跨井段验证和不确定性估计。</p>
+  <p><b>标签稀缺：</b>断裂案例极少，大量预防性更换属于右删失；不能把“没有断裂”误作长期安全。应关注漏报、误报、风险提前量、探伤一致性及按井/钻具分组后的泛化性能。线性 Miner 没有完整刻画载荷顺序效应、多轴疲劳及裂纹扩展，<b>D = 1 只能作为选定模型的临界参考</b>。</p>
+  <div class="callout warn"><b>Human-in-the-loop：</b>起钻有停工成本，继续钻进有钻具完整性和井下复杂事故风险。AI 负责提示理由和不确定性；工程师依据现场安全制度与真实检验信息作最终决定，不能因教学计算的 D 尚未到 1 就许可继续作业。</div>
+  </div></div>
+</section>
+<section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+  <div class="eyebrow">02 / FROM VIBRATION TO HUMAN DECISION</div>
+  <h2 class="section-title">五步看懂：AI 给钻具“听诊”，工程师决定是否起钻</h2>
+  <p class="lead">先听出钻具是否在异常振动，再估算已消耗的疲劳寿命，最后把建议送到工程师面前。<b>AI 负责发现和解释风险，起钻或继续钻进必须由人判断并授权。</b></p>
+
+  <div class="flow-roles" aria-label="流程参与角色">
+    <span class="flow-role machine"><i></i>01–03 / 机器处理与预警</span>
+    <span class="flow-role human-role"><i></i>04 / 工程师拍板</span>
+    <span class="flow-role feedback-role"><i></i>05 / 人工反馈回到模型</span>
+  </div>
+
+  <div class="pipeline flow-pipeline" aria-label="钻具失效预警五步流程">
+    <article class="pipe flow-step">
+      <span class="flow-step-index">01 · SENSOR</span>
+      <span class="flow-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M3 17h5l3-8 5 15 4-11 3 4h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="1" opacity=".3"/></svg>
+      </span>
+      <b>数据收集与“降噪”</b>
+      <span class="flow-nickname">听诊器：听清真正的受力变化</span>
+      <p class="flow-step-desc">井下振动像嘈杂的机器声。AI 先清除传感器毛刺、时间错位等干扰，<b>保留真正的冲击与粘滑信号</b>。</p>
+      <div class="flow-io"><span>输入</span><p>振动、扭矩、转速、狗腿度</p><span>输出 → 第 2 步</span><p>整理好的载荷时序</p></div>
+      <small>机器 · 整理证据</small>
+    </article>
+
+    <article class="pipe flow-step">
+      <span class="flow-step-index">02 · PHYSICS + AI</span>
+      <span class="flow-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M5 25h22M8 22V12m6 10V7m6 15v-8m6 8V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M6 10l6-5 7 5 7-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <b>物理 + AI 融合预测</b>
+      <span class="flow-nickname">计步器：累计疲劳“消耗账单”</span>
+      <p class="flow-step-desc">神经网络识别振动模式；Miner 法则按不同应力水平的循环次数“记账”，估算累计损伤 D 和剩余寿命 RUL。</p>
+      <div class="flow-io"><span>输入</span><p>载荷时序 + 材料 S–N 曲线</p><span>输出 → 第 3 步</span><p>损伤 D、寿命区间</p></div>
+      <small>机器 · 计算风险</small>
+    </article>
+
+    <article class="pipe flow-step flow-alert-step">
+      <span class="flow-step-index">03 · RISK ALERT</span>
+      <span class="flow-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M16 4 29 27H3L16 4Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M16 12v7m0 4v1" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      </span>
+      <b>多级风险预警</b>
+      <span class="flow-nickname">预警灯：把复杂计算变成提醒</span>
+      <p class="flow-step-desc">当演示损伤 D 接近 <b>0.80</b>，系统开始预警；若风险继续恶化则升级红色告警，提示“建议起钻检查/更换”。</p>
+      <div class="flow-io"><span>输入</span><p>D、RUL 与风险证据</p><span>输出 → 工程师</span><p>预警等级 + 建议及理由</p></div>
+      <small>机器 · 只建议，不下命令</small>
+      <span class="flow-boundary-label" aria-hidden="true">建议 → 授权</span>
+    </article>
+
+    <article class="pipe flow-step human flow-human-step">
+      <span class="flow-step-index">04 · HUMAN GATE</span>
+      <span class="flow-icon human-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="9" r="5" stroke="currentColor" stroke-width="2"/><path d="M7 29v-7a9 9 0 0 1 18 0v7M12 23v6m8-6v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <b>工程博弈决策</b>
+      <span class="flow-nickname">工程师：降本 vs 控险</span>
+      <p class="flow-step-desc">起钻有停工和更换成本；继续最后 <b>20 m</b> 可能省时间，却可能遇断钻具。工程师结合真实井况审核，决定是否批准。</p>
+      <div class="flow-io"><span>输入</span><p>AI 建议 + 现场状态</p><span>输出 → 第 5 步</span><p>人工授权、理由和措施</p></div>
+      <small>人 · 唯一最终决策门</small>
+      <div class="flow-human-badge">工程博弈 · 降本 VS 控险</div>
+    </article>
+
+    <article class="pipe flow-step">
+      <span class="flow-step-index">05 · FEEDBACK</span>
+      <span class="flow-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" fill="none"><path d="M25 13a10 10 0 1 0 0 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M23 7v8h8M10 17l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <b>执行与反馈闭环</b>
+      <span class="flow-nickname">病例本：把这次经验留给下次</span>
+      <p class="flow-step-desc">记录安全起钻、探伤结果，或继续钻进后的损伤与事故；未断裂样本同样保留“截至目前未失效”的信息。</p>
+      <div class="flow-io"><span>输入</span><p>人工决策 + 实际检查结果</p><span>输出 → 下一轮模型</span><p>有审核依据的高价值标签</p></div>
+      <small>人 → 机器 · 经验回流</small>
+    </article>
+  </div>
+
+  <figure class="paper-figure physics-gate-figure">
+    <div class="figure-head"><b>数据预测为什么还要经过“物理审查门”？</b><span>PHYSICS-GUIDED REGULARIZATION</span></div>
+    <svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="高频振动进入 LSTM，网络输出预测损伤，与 S N 曲线和 Miner 累积得到的参考损伤比较，形成物理损失，再反馈优化网络；输出的建议须由工程师审核">
+      <defs><marker id="physical-arrow-d4" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M1 1L7 4L1 7" fill="none" stroke="#2f7d6b" stroke-width="1.5"/></marker></defs>
+      <rect x="14" y="36" width="166" height="66" rx="8" fill="#f5f2ea" stroke="#ddd7c8"/><text x="97" y="62" text-anchor="middle" font-size="13" fill="#242b2e">高频振动 / 扭矩</text><text x="97" y="81" text-anchor="middle" font-size="11" fill="#79828a">传感器窗口</text>
+      <rect x="218" y="36" width="170" height="66" rx="8" fill="#e6f1ec" stroke="#a4cdbb"/><text x="303" y="62" text-anchor="middle" font-size="13" fill="#235f51" font-weight="700">LSTM / 1D-CNN</text><text x="303" y="81" text-anchor="middle" font-size="11" fill="#4d565b">预测 D 与 RUL</text>
+      <rect x="429" y="26" width="193" height="87" rx="9" fill="#fbf4e8" stroke="#b26a39" stroke-width="2.2"/><text x="525" y="50" text-anchor="middle" font-size="13" fill="#8e5229" font-weight="700">物理约束门</text><text x="525" y="71" text-anchor="middle" font-size="11" fill="#4d565b">预测增量 ≈ Miner 增量</text><text x="525" y="91" text-anchor="middle" font-size="11" fill="#4d565b">损伤不能无故倒退</text>
+      <rect x="660" y="36" width="218" height="66" rx="8" fill="#e6f1ec" stroke="#2f7d6b" stroke-width="2.3"/><text x="769" y="62" text-anchor="middle" font-size="13" fill="#235f51" font-weight="700">工程师最终授权</text><text x="769" y="81" text-anchor="middle" font-size="11" fill="#4d565b">检查 / 起钻 / 不采纳</text>
+      <g stroke="#2f7d6b" stroke-width="2" fill="none" marker-end="url(#physical-arrow-d4)"><path d="M180 69H216"/><path d="M388 69H426"/><path d="M622 69H658"/></g>
+      <rect x="212" y="146" width="255" height="47" rx="7" fill="#fff" stroke="#e9e4d8"/><text x="339" y="164" text-anchor="middle" font-size="12" fill="#242b2e">S–N 材料曲线 + Miner 累积</text><text x="339" y="181" text-anchor="middle" font-size="10" fill="#79828a">需应力标定 / 循环计数</text>
+      <path d="M466 168H525V116" fill="none" stroke="#b26a39" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#physical-arrow-d4)"/><path d="M525 114V200H305V196" fill="none" stroke="#b26a39" stroke-width="1.6" stroke-dasharray="4 5"/><text x="654" y="170" text-anchor="middle" font-size="11" fill="#8e5229">违背规律 → 训练阶段加罚</text><text x="654" y="186" text-anchor="middle" font-size="10" fill="#79828a">不是实际部署时的自动硬联锁</text>
+    </svg>
+    <figcaption><b>图 4｜</b>振动网络与 Miner 物理估计之间的损失约束；物理审查发生在训练环节，现实现场仍需独立的风险联锁与人工审批。</figcaption>
+  </figure>
+  <div class="flow-handoff-band" role="note" aria-label="机器建议交给人类授权">
+    <span class="flow-handoff-machine">机器：提供损伤、寿命区间和预警理由</span>
+    <span class="flow-handoff-arrow">机器建议 <span aria-hidden="true">⟶</span> <strong>人工授权</strong></span>
+    <span class="flow-handoff-human">人类：综合安全、任务和检修成本后拍板</span>
+  </div>
+
+  <div class="sec4">
+    <div class="sn">01<span>PINN LOSS</span></div>
+    <div class="sec4-body">
+      <h2>为什么让网络“边看数据，边做疲劳物理作业”？</h2>
+      <p>传统神经网络依赖大量“真实断裂时刻”样本，但现场更多是尚未断裂就被起钻的钻具。我们在损伤预测网络之外，加一条“材料物理老师”的监督路线：根据标定应力谱、雨流计数、S–N 曲线得到 Miner 损伤增量，训练时要求网络预测不能随意背离它。</p>
+      <div class="math-card pinn-loss-card">
+        <div class="math-eyebrow">COMPOSITE PHYSICS-INFORMED LOSS</div>
+        <div class="main-loss-formula" role="math" aria-label="总损失等于数据损失加 lambda 乘物理损失"><span class="math-italic">L</span><span>=</span><span class="math-italic">L</span><sub>data</sub><span>+</span><span class="math-italic">λ</span><span>·</span><span class="math-italic">L</span><sub>physics</sub></div>
+        <div class="loss-details-grid">
+          <div><b>经验教训：L<sub>data</sub></b><div class="mini-formula">MSE( RUL<sub>pred</sub>, RUL<sub>label</sub> )</div><p>仅对有可靠寿命标签的样本计算；其他样本要按右删失生存分析处理，不能直接当作已知寿命。</p></div>
+          <div><b>物理常识：L<sub>physics</sub></b><div class="mini-formula">( ΔD<sub>pred</sub> − ΔD<sub>Miner</sub> )² + μ[−ΔD<sub>pred</sub>]<sub>+</sub>²</div><p>一方面逼近 Miner 估计的损伤增量，另一方面禁止网络在持续服役中无依据地预测“负损伤”。</p></div>
+          <div><b>老师话语权：λ</b><div class="mini-formula">λ ≥ 0</div><p>权重控制物理约束影响；需结合交叉验证与不确定性校准，不是越大越好。</p></div>
+        </div>
+        <p class="equation-caption">这里的损伤物理项由 Miner 线性累积假设构造，并非直接求解钻柱应力场 PDE，也不是“能量守恒残差”。物理惩罚是软约束，不能保证所有工况预测都正确。</p>
+      </div>
+      <div class="code-card">
+        <div class="code-head"><span>Python / PyTorch · 一个 Epoch 中的损失计算示意</span><span>PHYSICS + DATA</span></div>
+        <pre><code><span class="cm"># windows: 高频振动/扭矩窗口；d_prev: 历史损伤</span>
+<span class="cm"># miner_delta: 已由应力反演、雨流计数、S–N 曲线算出</span>
+for windows, d_prev, miner_delta, rul_y, observed in loader:
+    optimizer.zero_grad()
+    damage_delta, rul_pred = model(windows)
+    damage_pred = d_prev + damage_delta
+    physics_target = d_prev + miner_delta
+
+    <span class="cm"># 只对真正有失效寿命标签的样本监督 RUL</span>
+    if observed.any():
+        loss_data = ((rul_pred[observed] - rul_y[observed])**2).mean()
+    else:
+        loss_data = 0.0 * rul_pred.sum()
+
+    loss_miner = ((damage_pred - physics_target)**2).mean()
+    loss_mono = torch.relu(-damage_delta).square().mean()
+    loss_physics = loss_miner + mu * loss_mono
+    loss = loss_data + lam * loss_physics
+    loss.backward()
+    optimizer.step()
+
+<span class="cm"># 推理阶段只发出建议；最终起钻由工程师批准</span>
+recommendation = explain(damage_pred, rul_pred)</code></pre>
+      </div>
+      <div class="plain-translation"><div class="translation-mark">译</div><div><strong>把代码翻译成人话</strong><p>第一步，AI 看振动，猜这根钻具又损伤了多少；第二步，用材料试验的 S–N 曲线和 Miner 法则算一份“参考账本”；第三步，两份账对不上、或者 AI 预测损伤倒退，就给网络加罚；第四步，用少量可靠失效寿命标签纠正寿命预测。最后输出“为什么危险”的理由，交给工程师决定，而不是网络自己操作钻机。</p></div></div>
+      <p class="hint">上方为训练逻辑示例，未包含完整数据预处理、右删失似然、材料参数不确定性及模型校准；对于无失效终点的样本，完整系统应增加生存分析或区间删失损失。本页面实际仍运行简化疲劳代理而非训练好的 PINN。</p>
+    </div>
+  </div>
+  <div class="sec4">
+    <div class="sn">02<span>TRADE-OFF</span></div>
+    <div class="sec4-body">
+      <h2>为什么还需要工程师来“拍板”？</h2>
+      <div class="trade-grid">
+        <div><strong>方案 A · 立即起钻检查/更换</strong><p>多一次起下钻和检修，短期成本变高；但可以检查裂纹、减少高风险钻具继续服役的暴露。</p><span class="safecol">主要考虑：完整性与风险控制</span></div>
+        <div><strong>方案 B · 继续钻进最后 20 m（教学情境）</strong><p>有机会完成眼前进尺，却继续增加疲劳损伤，且现场不能仅凭预测分数自行冒险作业。</p><span class="dangercol">主要考虑：工期与成本，同时面对不确定风险</span></div>
+      </div>
+      <div class="callout"><b>AI 如何服务，而不是替人接管：</b>它像“超级副驾”一样把异常、损伤和不确定性汇总给工程师；工程师结合钻具检验、井况和现行作业规程决定是否批准，并留下决策及结果。演示中的 20 m 仅用于展示工程权衡，不构成继续钻进建议。</div>
+    </div>
+  </div>
+</section>
+<section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+  <div class="eyebrow">03 / DRILLSTRING HEALTH DIGITAL LAB · HUMAN-IN-THE-LOOP</div><h2 class="section-title">钻具疲劳监测与起钻决策实验台</h2><p class="lead">每 0.9 秒推进一段虚拟服役过程；Miner 损伤逐步累加，振动谱随工况变化而改变。<b>当 D &gt; 0.80 时建议起钻；D ≥ 1.00 时教学仿真锁定，不代表现场存在确定断裂阈值。</b></p>
+  <div class="statebar" id="statebar" role="status" aria-live="polite"><i class="state-dot"></i><strong id="state-title">正在监测：剩余寿命与疲劳损伤</strong><span id="state-label">NORMAL / WATCH</span></div>
+  <div class="lab-grid">
+    <div class="lab-left">
+      <article class="card"><div class="card-head"><strong>剩余使用寿命 RUL · 时序估计</strong><span>小时（h）/ 压缩演示时间</span></div><svg id="rul-chart" viewBox="0 0 820 326" role="img" aria-label="横轴累计模拟服役时间小时，纵轴剩余寿命小时，绿色剩余寿命估计线与红色预警底线"></svg><div class="legend"><span><i class="swatch green"></i>RUL 代理估计</span><span><i class="swatch red dash"></i>警戒线 3 h</span></div><p class="figcap"><b>图 2｜</b>RUL 为按模拟损伤速率外推的教学估计值，不代表真实网络预测的剩余寿命或可信区间。</p></article>
+      <article class="card"><div class="card-head"><strong>井下振动时域信号 · 高频采样窗口</strong><span>合成采样率 200 Hz</span></div><svg id="vibration-chart" viewBox="0 0 820 230" role="img" aria-label="横轴时间毫秒，纵轴振动相对幅值，橙色井下振动波形与参考范围"></svg><div class="legend"><span><i class="swatch clay"></i>振动响应</span><span><i class="swatch gray"></i>参考振幅带</span></div><p class="figcap"><b>图 3｜</b>模拟井下振动时域波形，包含周期振动、黏滑扰动与短时冲击；数值为归一化幅值，不能当作现场加速度标定数据。</p></article>
+      <article class="card left-explainer"><div class="card-head"><strong>疲劳损伤账本 / 物理与 AI 交叉核查</strong><span>MINER DAMAGE BUDGET</span></div><div class="damage-track" aria-label="累计疲劳损伤进度"><div id="damage-fill"></div><i class="damage-threshold"></i></div><div class="budget-labels"><span>0 · 新钻具</span><span class="critical-limit">D &gt; 0.80 · 预警</span><span class="failure-limit">D ≥ 1.00 · 模型临界</span></div><div class="risk-spectrum-legend"><span><i class="risk-swatch low"></i>累计损伤较低</span><span><i class="risk-swatch mid"></i>接近警戒</span><span><i class="risk-swatch high"></i>高风险</span></div><div class="explain-grid"><div><small>物理损伤增量</small><b id="damage-rate">+0.000</b><span>ΔD / tick</span></div><div><small>振动特征 RMS</small><b id="vib-rms">0.00</b><span>归一化</span></div><div><small>数据–物理偏差</small><b id="residual">0.000</b><span>代理残差</span></div><div><small>状态</small><b id="model-state">基线一致</b><span>非训练模型</span></div></div><div class="callout subtle"><b>AI 为什么能服务？</b> 传感器提供动态波形证据，Miner 理论提供随循环累积的可解释约束。两者不一致时，应先核查材料、传感器和工况，不应机械地相信某一个 RUL 数值。</div></article>
+    </div>
+    <div class="lab-right">
+      <article class="card health-card"><div class="card-head"><strong>钻具健康状态 / 关键指标</strong><span>DRILLSTRING HEALTH</span></div><div class="metric-grid"><div><small>健康度 · 教学代理</small><b id="health-val">—</b><span>%</span></div><div><small>累计 Miner 损伤</small><b id="damage-val">—</b><span>D</span></div><div><small>当前进尺</small><b id="depth-val">—</b><span>m</span></div><div><small>RUL 估计</small><b id="rul-val">—</b><span>h</span></div></div><div class="minor-kpis"><span>累计模拟服役 <b id="time-val">—</b> h</span><span>钻具批次 <b id="tool-val">T-001</b></span></div></article>
+      <article class="card ai-card" id="ai-card"><div class="card-head"><strong>AI 物理–时序融合辅助判断</strong><span>PHYSICS-AWARE ASSISTANT</span></div><div class="ai-indicator" id="ai-indicator"><span class="ai-lamp"></span><div><b id="ai-headline">当前处于监测窗口</b><p id="ai-reason">同时监控振动强度、Miner 累积损伤与寿命代理；此处未加载真实 LSTM 训练权重。</p></div></div><div class="triad"><div><small>物理证据</small><b id="physics-evidence">D = 0.00</b></div><div><small>时序证据</small><b id="sequence-evidence">RMS = 0.00</b></div><div><small>AI 输出</small><b id="decision-evidence">继续监测</b></div></div></article>
+      <div class="handoff-line"><span>机器：损伤与 RUL 建议</span><b>→ HUMAN 审核 →</b><span>人：决定是否起钻</span></div>
+      <article class="card decision-card action-card"><div class="card-head"><strong>工程博弈 · 人工决策门</strong><span>HUMAN-IN-THE-LOOP</span></div><div class="approval-chip">● 等待工程师审核 / 授权</div><p>若继续钻进，可争取完成短井段，但材料损伤与不确定性增加。<b>工程师不能把教学损伤阈值当作安全许可。</b></p><label for="advance">暂缓时计划再钻 <output id="advance-value">30 m</output></label><input type="range" id="advance" min="10" max="50" step="10" value="30"><div class="range-ends"><span>10 m</span><span>50 m</span></div><div class="decision-actions"><button id="trip-btn" type="button" class="btn primary">采纳建议 · 立即起钻更换</button><button id="continue-btn" type="button" class="btn danger">暂缓 · 带风险继续钻进</button></div><button id="reset-btn" type="button" class="btn ghost" hidden>重置教学场景（故障后恢复）</button><div class="decision-result" id="decision-result">当前控制权归工程师；仅记录虚拟决定，不连接设备。</div><div class="risk-trade"><div><b>起钻成本</b><span>换钻具、占用作业时间</span></div><div><b>继续风险</b><span>损伤累积、可能触发教学终止</span></div></div></article>
+      <article class="card log-card"><div class="card-head"><strong>人工决策与结果回流</strong><span>FEEDBACK AUDIT</span></div><ol id="audit-log" aria-live="polite"><li>暂无人工决策。点击按钮后会记录时间、损伤、进尺与决策类型。</li></ol><div class="audit-bottom"><b id="feedback-num">0</b> 条已记录人工反馈 <span>含虚拟检修/持续钻进结果</span></div></article>
+    </div>
+  </div>
+  <p class="safety-note">教学安全声明：所有循环载荷、S–N 容量、损伤增长和寿命均为虚构数值。真实检修、起钻和继续钻进必须依据经批准的井场规程、工程师评估和设备检查，不可根据此页面决策。</p>
+</section>
+</main>
+<footer><span>Petro × AI Atlas / 钻具失效预测</span><span>Human-in-the-loop · Physics-informed teaching simulator · d4</span></footer>
+</div>
+<script src="demo.js"></script>
+</body>
+</html>

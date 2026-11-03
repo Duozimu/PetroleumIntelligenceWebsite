@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>井下复杂前兆预警 · Petro × AI Atlas</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="site-wrap">
+  <header class="doc-head">
+    <nav class="crumb" aria-label="当前位置"><span>总览</span><i>/</i><span>作业链</span><i>/</i><span>钻井</span><i>/</i><strong>井下复杂前兆预警</strong></nav>
+    <div class="dh-kicker"><span class="tag stage-tag">环节 03 · 钻井</span><span class="tag method-tag">ML 机器学习</span><span class="tag method-tag">XAI 可解释性</span><span class="tag case-tag"><i class="live-dot"></i>案例 d2-alert · v1.1.0</span></div>
+    <h1 class="dh-title">井下复杂前兆预警</h1>
+    <p class="dh-sub">井漏与气侵的体积失衡、卡钻前扭矩异常往往和接单根、起下钻、泵速切换叠加。现场同一压力变化可能来自泵况或井筒事件，因此系统需先识别工况，再融合<span class="academic-highlight">多变量时间窗口、机理残差和可解释证据</span>；<strong>AI 提示风险，司钻根据现场井控程序做最终判断。</strong></p>
+    <div class="dh-tags"><span class="dtag" data-d="高">● 难度 高</span><span class="tag">D2</span><span class="tag subtle">多变量时序 · 机理融合 · Human-in-the-loop</span></div>
+  </header>
+  <div class="tabs" role="tablist" aria-label="案例结构">
+    <button class="tab on" type="button" role="tab" id="tab-bg" data-tab="bg" aria-controls="panel-bg" aria-selected="true"><span class="tab-no">01</span> 专业背景</button>
+    <button class="tab" type="button" role="tab" id="tab-flow" data-tab="flow" aria-controls="panel-flow" aria-selected="false"><span class="tab-no">02</span> 案例流程</button>
+    <button class="tab" type="button" role="tab" id="tab-demo" data-tab="demo" aria-controls="panel-demo" aria-selected="false"><span class="tab-no">03</span> 交互演示</button>
+  </div>
+  <main>
+    <section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+      <div class="judge">
+        <div class="jc"><span class="jl">数据形态</span><b>多通道时序</b><span>压力 / 扭矩 / 流量 / 池体积</span></div>
+        <div class="jc"><span class="jl">标注成本</span><b>高</b><span>事故样本稀少，需人工复核</span></div>
+        <div class="jc"><span class="jl">可见收益</span><b>提前识别</b><span>降低漏看与无效误报</span></div>
+        <div class="jc"><span class="jl">技术难度</span><b>高</b><span>工况漂移 + 类别极不均衡</span></div>
+      </div>
+      <div class="lede-block"><span class="kicker">专业场景介绍</span><p>井下复杂预警不能靠单根曲线“亮红灯”。钻进与接单根的泵状态不同，立压、返出量和池体积本就会发生协同变化。<strong>先识别作业状态，再判断多通道关系是否偏离该状态的正常基线</strong>，才能在提前量与误报率之间建立可信权衡。</p></div>
+      <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec4-body">
+        <h2>异常并非单一尖峰，而是多个微弱证据的组合</h2>
+        <p>稳态循环中，返出流量 <span class="math-inline">Q<sub>out</sub></span> 与入口流量 <span class="math-inline">Q<sub>in</sub></span> 的差值，加上池体积变化，构成早期井漏/井涌筛查的重要证据；但泵启停、井筒储集效应、气体可压缩性和地面回流测量延迟都可能使其暂时失衡。立管压力 SPP 还受泵排量、泥浆流变与喷嘴压降影响；扭矩则随 WOB、RPM、井斜及摩阻变化。<strong>同样的“立压下降”在停泵与循环中的工程含义完全不同。</strong> 2024 年 SPE-221371-MS 明确采用不同作业阶段的识别和事件检测算法，以减少跨工况误判。<a class="ref academic-ref" href="https://doi.org/10.2118/221371-MS" target="_blank" rel="noopener noreferrer">文献：SPE-221371-MS</a></p>
+        <figure class="paper-figure">
+          <div class="figure-top"><b>多变量异常先兆：单通道很平稳，联合证据正在偏离</b><span>SCHEMATIC · NOT FIELD DATA</span></div>
+          <svg viewBox="0 0 940 390" role="img" aria-label="四个归一化时序通道，正常区、井漏前兆区以及联合异常融合得分，图中包含时轴、曲线与图例" xmlns="http://www.w3.org/2000/svg">
+            <defs><linearGradient id="dangerbg" x1="0" x2="1"><stop offset="0" stop-color="#f9e9e5" stop-opacity=".12"/><stop offset="1" stop-color="#f9e9e5" stop-opacity=".92"/></linearGradient></defs>
+            <rect x="100" y="31" width="755" height="307" fill="#fdfcf9" rx="4"/><rect x="600" y="31" width="255" height="307" fill="url(#dangerbg)"/>
+            <g stroke="#e9e4d8" stroke-width="1"><path d="M100 101H855M100 171H855M100 241H855M100 311H855M100 31V338M225 31V338M350 31V338M475 31V338M600 31V338M725 31V338M855 31V338" stroke-dasharray="3 5"/></g>
+            <g font-family="system-ui,sans-serif" font-size="11" fill="#79828a"><text x="92" y="60" text-anchor="end">立压 ΔP</text><text x="92" y="130" text-anchor="end">返出流量 ΔQ</text><text x="92" y="200" text-anchor="end">池体积 ΔV</text><text x="92" y="270" text-anchor="end">融合风险分数</text><text x="100" y="355">−60 min</text><text x="600" y="355" text-anchor="middle">−20 min</text><text x="855" y="355" text-anchor="end">现在</text><text x="477" y="378" text-anchor="middle">相对监测时间（示意）</text><text x="114" y="22" fill="#235f51">正常基线区</text><text x="843" y="22" text-anchor="end" fill="#b05a51">多变量前兆积累区</text></g>
+            <path d="M100 64L150 60L200 66L250 62L300 68L350 64L400 63L450 66L500 62L550 65L600 67L645 67L690 72L735 76L790 84L855 91" fill="none" stroke="#41699b" stroke-width="2.8" stroke-linejoin="round"/>
+            <path d="M100 129L150 124L200 132L250 128L300 131L350 125L400 128L450 131L500 127L550 130L600 130L645 135L690 139L735 145L790 150L855 157" fill="none" stroke="#2f7d6b" stroke-width="2.8" stroke-linejoin="round"/>
+            <path d="M100 199L150 196L200 200L250 198L300 201L350 199L400 196L450 200L500 199L550 201L600 201L645 204L690 212L735 220L790 230L855 236" fill="none" stroke="#b26a39" stroke-width="2.8" stroke-linejoin="round"/>
+            <path d="M100 307L150 304L200 302L250 306L300 303L350 301L400 303L450 301L500 304L550 303L600 301L645 292L690 278L735 262L790 246L855 246" fill="none" stroke="#b05a51" stroke-width="3.3" stroke-linejoin="round"/>
+            <path d="M100 260H855" stroke="#b05a51" stroke-dasharray="6 4"/><text x="845" y="253" text-anchor="end" font-size="10" fill="#b05a51">警戒阈值</text>
+            <circle cx="790" cy="246" r="5" fill="#b05a51" stroke="white" stroke-width="2"/><path d="M790 241L770 216" stroke="#b05a51"/><rect x="684" y="180" width="168" height="33" rx="6" fill="white" stroke="#e5c2bd"/><text x="698" y="194" font-size="10.5" fill="#7b3431" font-family="system-ui,sans-serif">三项偏差方向一致</text><text x="698" y="206" font-size="9.5" fill="#a04b43" font-family="system-ui,sans-serif">触发联合异常预警</text>
+          </svg>
+          <figcaption><b>图 1</b><span>正常波动与井漏前兆的概念示意：立压、返出流量与池体积单独变化不大，但其联合残差持续累积使融合分数越过阈值。纵轴为相对趋势，非实际物理量。</span></figcaption>
+        </figure>
+      </div></div>
+      <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec4-body">
+        <h2>混合检测：学“正常模式”，再解释“偏离在哪里”</h2>
+        <p>以正常循环、接单根和起下钻等各类工况的时间窗口训练 AE / 1D-CNN-AE，可学习多传感器之间的正常耦合。实时窗口如果难以重构，说明其统计结构偏离正常样本，但<strong>高重构误差≠已经发生井涌</strong>。另一条证据链来自机理：比较出入口流量、池体积导数以及立压—泵况、扭矩—WOB/RPM 的条件残差；通过质量门控和方向一致性减少误报。SPE-218837-MS 报告了采用物理约束与数据驱动混合方案的实际井漏/井涌检测研究；SPE-231854-PA 则报道了基于 CNN-AE 的早期气侵检测研究。<a class="ref academic-ref" href="https://doi.org/10.2118/218837-MS" target="_blank" rel="noopener noreferrer">SPE-218837-MS</a> <a class="ref academic-ref" href="https://doi.org/10.2118/231854-PA" target="_blank" rel="noopener noreferrer">SPE-231854-PA</a></p>
+        <div class="method-board"><div><span>DATA</span><b>多通道窗口 X(t)</b><small>压力、扭矩、入口/返出流量、池体积、工况</small></div><i>→</i><div><span>MODEL</span><b>AE 重构残差</b><small>偏离正常模式的强弱</small></div><i>+</i><div><span>PHYSICS</span><b>水力 / 摩阻残差</b><small>偏离可解释机理基线</small></div><i>→</i><div class="method-human"><span>HUMAN</span><b>司钻核实</b><small>人决定是否采信</small></div></div>
+        <div class="callout"><b>关键边界</b>　演示中的 AE 分数是“重构残差代理量”，XAI 是有证据链的规则归因，不声称已经训练了真实 AE、SHAP 或强化学习模型。</div>
+      </div></div>
+      <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec4-body">
+        <h2>传感器、工况与事故记录必须同步</h2>
+        <table class="dtable"><thead><tr><th>数据层</th><th>代表字段</th><th>价值 / 风险</th></tr></thead><tbody><tr><td>水力循环</td><td>入口排量、返出流量、立压、池体积</td><td>识别流量失衡、泄漏与气侵候选</td></tr><tr><td>机械状态</td><td>扭矩、转速、钻压、钩载</td><td>辅助辨别卡钻、摩阻增加和停钻工况</td></tr><tr><td>工况上下文</td><td>钻进、接单根、停泵、起下钻</td><td>过滤正常作业切换引起的假阳性</td></tr><tr><td>事故与反馈</td><td>事件时间段、核实原因、人工决策</td><td>构造难例、审计与离线模型修正</td></tr></tbody></table>
+      </div></div>
+      <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec4-body">
+        <h2>真正难的是误报抑制与可信解释</h2>
+        <p>正样本数量少，且真实井控事件与日常作业高度不平衡。含事件的相邻时间窗口若同时进入训练集和测试集，会发生时间泄漏；应按照<strong>井、井段或完整事件</strong>划分。风险评价不能只看 Accuracy，应考察事件级 Recall、提前量、每 24 小时误报次数（或每 100 次接单根误报数）、误报后复核成本和漏报代价；阈值需在独立现场数据上校准。断续泵、漂浮式钻机运动、传感器卡值、井下多相流均可能改变正常基线。</p>
+        <div class="refs"><span class="ref">无监督异常检测（AE）</span><span class="ref">物理信息融合</span><span class="ref">可解释性 AI（XAI）</span><span class="ref">事件级评估</span><span class="ref">Human-in-the-loop</span></div>
+      </div></div>
+      <div class="sec4 academic-sec"><div class="sn">05<span>BENCHMARK</span></div><div class="sec4-body">
+        <h2>为什么固定阈值不足够？——传统方法与条件化异常检测</h2>
+        <table class="dtable academic-table"><thead><tr><th>对比维度</th><th>固定阈值 / 人工看曲线</th><th>工况感知 AE + 物理约束</th></tr></thead><tbody>
+          <tr><td>工况切换</td><td>泵停时立压骤降，容易触发误报</td><td>先识别工况，再调用适用的条件基线</td></tr>
+          <tr><td>早期弱信号</td><td>单项变化不越线时可能漏报</td><td>联合时间窗与流量/池体积残差发现组合偏离</td></tr>
+          <tr><td>工程解释</td><td>只显示“某数值超限”</td><td>解释流量差、池体积方向及扭矩/立压残差</td></tr>
+          <tr><td>维护代价</td><td>需人工频繁重设阈值</td><td>需要工况分组、标签核验与漂移校准，同样有代价</td></tr>
+          <tr><td>失效边界</td><td>隐蔽组合异常</td><td>训练域外工况、传感器坏点、罕见故障可失效</td></tr>
+        </tbody></table>
+        <div class="callout">AI 不是井控联锁的替代品：模型用于提供额外证据与审核优先级；现场既有报警、井控程序和人工职责必须继续有效。</div>
+      </div></div>
+      <div class="sec4 academic-sec"><div class="sn">06<span>REFERENCES</span></div><div class="sec4-body">
+        <h2>研究与培训资料（点击查看公开出处）</h2>
+        <ol class="academic-refs">
+          <li><a href="https://doi.org/10.2118/218837-MS" target="_blank" rel="noopener noreferrer">Zhang &amp; Samuel (2024), SPE-218837-MS</a>：混合数据驱动与物理约束的井涌/井漏早期检测。</li>
+          <li><a href="https://doi.org/10.2118/221371-MS" target="_blank" rel="noopener noreferrer">Zhang &amp; Samuel (2024), SPE-221371-MS</a>：全作业阶段事件检测与分工况预警。</li>
+          <li><a href="https://doi.org/10.2118/197275-MS" target="_blank" rel="noopener noreferrer">Mao &amp; Zhang (2019), SPE-197275-MS</a>：基于实时曲线趋势的自动井涌报警与分级指标。</li>
+          <li><a href="https://doi.org/10.2118/231854-PA" target="_blank" rel="noopener noreferrer">Lima et al. (2026), SPE-231854-PA</a>：1D CNN-AE 用于海上井涌早期检测。</li>
+          <li><a href="https://iadc.org/wp-content/uploads/2021/01/WSP-02-DO-I_IntroCurr-2nd-Ed_rev3.pdf" target="_blank" rel="noopener noreferrer">IADC WellSharp · Drilling Operations Introductory Curriculum</a>：井控人员培训课程包括池体积、流量、停泵返出等监测主题，不是本演示评分算法的认证标准。</li>
+        </ol>
+      </div></div>
+
+    </section>
+
+    <section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+      <div class="case-lead"><div><span class="kicker clay">CASE WALKTHROUGH</span><h2>从多源信号到可解释预警：五步人机闭环</h2><p>传统做法是守着死阈值等待报警；AI 可以从多通道弱偏离中提供提前核实线索。假设提前 5 分钟，是教学目标示意，并非任何现场预测保证。系统必须把工况识别放在异常判断之前，并把“司钻核实”放在任何处置之前。人工驳回不等于物理风险消失：新的监测证据仍会触发后续提示。</p></div><div class="case-cells"><div><small>输入通道</small><b>6+</b></div><div><small>方法组合</small><b>AE + 机理</b></div><div><small>分级结果</small><b>三级</b></div><div><small>最终处置</small><b>Human</b></div></div></div>
+      <div class="sec4"><div class="sn">01<span>PIPELINE</span></div><div class="sec4-body"><h2>模型给证据，人给决定</h2>
+        <div class="pipeline">
+          <div class="pipe"><div class="pipe-id">01 · DATA</div><div class="pipe-icon">▥</div><b>多源数据清洗</b><p>传感器对齐、坏点识别、作业状态标签</p><small>机器 · 数据质量</small></div>
+          <div class="pipe"><div class="pipe-id">02 · DETECT</div><div class="pipe-icon">◇</div><b>混合模型异常检测</b><p>AE 代理残差 + 水力 / 摩阻约束</p><small>机器 · 联合评分</small></div>
+          <div class="pipe"><div class="pipe-id">03 · XAI</div><div class="pipe-icon">≋</div><b>归因与证据展示</b><p>哪个通道偏离？是否和物理机理一致？</p><small>机器 · 可解释</small></div>
+          <div class="pipe human"><div class="pipe-id">04 · HUMAN</div><svg class="human-symbol" viewBox="0 0 48 48" role="img" aria-label="司钻人形符号"><circle cx="24" cy="12" r="7"/><path d="M12 39v-8a12 12 0 0 1 24 0v8M19 31v9m10-9v9"/></svg><b>司钻分级核实</b><p>确认风险 / 驳回干扰 / 按现场规程处置</p><small>人 · 不可跳过</small></div>
+          <div class="pipe"><div class="pipe-id">05 · FEEDBACK</div><div class="pipe-icon">↺</div><b>处置记录与反馈</b><p>事件、参数、决策、结果与复盘</p><small>人 → 模型 · 审计</small></div>
+        </div>
+        <div class="handoff"><span>机器：发现偏离 + 给出原因</span><strong>◆ Human decision gate ◆</strong><span>人：核实现场 + 决定处置</span></div>
+        <figure class="paper-figure narrow"><div class="figure-top"><b>预警信息的可追溯路径</b><span>EVIDENCE → DECISION → FEEDBACK</span></div>
+          <svg viewBox="0 0 850 232" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="水力证据、模型异常评分、XAI归因，经过司钻核实后写入反馈日志的闭环图">
+            <defs><marker id="arrowflow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#8aa69b"/></marker></defs>
+            <rect x="28" y="33" width="171" height="78" rx="9" fill="#f5f2ea" stroke="#ddd7c8"/><rect x="241" y="33" width="171" height="78" rx="9" fill="#f5f2ea" stroke="#ddd7c8"/><rect x="454" y="33" width="171" height="78" rx="9" fill="#e6f1ec" stroke="#a7c9bc"/><rect x="669" y="24" width="158" height="95" rx="9" fill="#fff" stroke="#2f7d6b" stroke-width="2.4"/>
+            <g fill="#242b2e" font-family="system-ui,sans-serif" font-size="13" text-anchor="middle"><text x="113" y="63">多通道观测</text><text x="113" y="83" font-size="11" fill="#79828a">flow / pressure / pit</text><text x="326" y="63">联合异常分数</text><text x="326" y="83" font-size="11" fill="#79828a">模型 + 物理</text><text x="539" y="63">可解释证据</text><text x="539" y="83" font-size="11" fill="#235f51">方向 · 强度 · 关联</text><text x="748" y="60" font-weight="700" fill="#235f51">司钻审核</text><text x="748" y="82" font-size="11">采纳 / 驳回</text></g>
+            <g stroke="#8aa69b" stroke-width="2" fill="none" marker-end="url(#arrowflow)"><path d="M199 72H237"/><path d="M412 72H450"/><path d="M625 72H665"/><path d="M749 120V172H112V115"/></g>
+            <rect x="304" y="157" width="245" height="45" rx="8" fill="#fbfaf6" stroke="#e9e4d8"/><text x="426" y="174" text-anchor="middle" font-size="12" fill="#4d565b" font-family="system-ui,sans-serif">反馈记录 / 离线复盘</text><text x="426" y="190" text-anchor="middle" font-size="10" fill="#79828a" font-family="system-ui,sans-serif">不直接修改现场控制设备</text>
+          </svg><figcaption><b>图 2</b><span>经过工况识别与证据解释，预警必须交给司钻核实；反馈用于审计与后续离线改进，不是自动关井闭环。</span></figcaption>
+        </figure>
+      </div></div>
+      <div class="sec4 academic-sec"><div class="sn">02<span>WHY AI</span></div><div class="sec4-body">
+        <h2>Why｜为什么“线性趋势 + 死阈值”难以识别复杂前兆？</h2>
+        <p>固定阈值隐含了“正常范围始终不变”的假设，而实际泵排量、钻压、转速、接单根与起下钻会不断改变正常值；线性回归即使使用多个通道，也较难表达<strong>跨时间的非线性耦合、阈值迟滞与多通道同向证据</strong>。AE 学习的是多变量正常窗口的联合形态，工况条件化降低把作业变化误报为事故的机会；流量守恒、压力与摩阻残差再提供物理可解释性。</p>
+        <div class="method-compare"><div><span>规则阈值</span><b>单通道越线 → 报警</b><small>适用于清晰的硬安全限值，但不擅长复杂工况关联</small></div><div><span>AE + 机理</span><b>联合偏离 → 核实证据</b><small>先识别工况，再评估重构与守恒残差</small></div><div><span>人在回路</span><b>分级解释 → 司钻研判</b><small>确认、驳回和现场结果均留痕</small></div></div>
+      </div></div>
+      <div class="sec4 academic-sec"><div class="sn">03<span>MODEL</span></div><div class="sec4-body">
+        <h2>How｜从“正常样本”学习重构基线，再叠加物理残差</h2>
+        <div class="math-card" aria-label="自编码器训练损失和多变量融合异常评分">
+          <div class="math-heading"><strong>1. 正常时序窗口的 AE 重构损失</strong><span>TRAIN ON NORMAL WINDOWS</span></div>
+          <div class="formula-center" role="math" aria-label="自编码器重构损失为所有训练窗、时间和通道的平方差均值">
+            <span class="mi">L</span><sub>AE</sub><span class="eq-op">=</span>
+            <span class="fraction"><span>1</span><span><span class="mi">N L C</span></span></span>
+            <span class="sigma-product" aria-label="分别对 n 从 1 到 N，t 从 1 到 L，c 从 1 到 C 求和"><span class="sigma-group"><span class="sigma-top">N</span><span class="sigma">∑</span><span class="sigma-bottom">n=1</span></span><span class="sigma-group"><span class="sigma-top">L</span><span class="sigma">∑</span><span class="sigma-bottom">t=1</span></span><span class="sigma-group"><span class="sigma-top">C</span><span class="sigma">∑</span><span class="sigma-bottom">c=1</span></span></span>
+            <span class="math-paren">(</span><span class="mi">X</span><sub>ntc</sub><span class="eq-op">−</span><span class="mi">X̂</span><sub>ntc</sub><span class="math-paren">)</span><sup>2</sup>
+          </div>
+          <p class="formula-note"><b>X</b> 是标准化后的正常传感器窗口，<b>X̂</b> 是 AE 重构；N 为窗口数、L 为窗口长度、C 为通道数。误差较高说明相对正常样本分布异常，并不能单独确诊事故。</p>
+          <div class="math-separator"></div>
+          <div class="math-heading"><strong>2. 实时融合评分（教学设计）</strong><span>PHYSICS + DATA FUSION</span></div>
+          <div class="formula-center formula-score" role="math" aria-label="融合异常评分等于 100 乘以归一化后的 0.2 倍重构误差和 0.8 倍物理残差的加权和">
+            <span class="mi">S</span><sub>t</sub><span class="eq-op">=</span>100&nbsp;·&nbsp;clip<span class="math-paren">(</span>0.20&nbsp;<span class="mi">e</span><sub>AE,t</sub><span class="eq-op">+</span>0.80&nbsp;<span class="mi">r</span><sub>phys,t</sub>,&nbsp;0,&nbsp;1<span class="math-paren">)</span>
+          </div>
+          <div class="math-detail-grid"><div><b>物理残差示例</b><span>r<sub>flow</sub> = Q<sub>out</sub> − Q<sub>in</sub> − b<sub>flow</sub>(mode)</span></div><div><b>井况方向性</b><span>井漏：r<sub>flow</sub> 向负、池体积下降；井涌：相反趋势</span></div></div>
+          <p class="formula-note">e<sub>AE,t</sub>、r<sub>phys,t</sub> 均需先经过<strong>正常工况分布归一化到 0–1</strong>，才能加权；0.20/0.80 仅是本教学仿真的示意权重。真实部署应由离线标注和误报代价校准权重与阈值，并对工况切换、坏点进行门控。</p>
+        </div>
+        <div class="why-explainer"><b>数学到底解决什么？</b>第一式让网络尽可能“记住正常的多通道时序关系”；第二式把网络觉得“不寻常”的强度与流量、池体积等物理证据合并，输出<strong>用于排序核查的分数</strong>。高分不是事故概率，必须由司钻核实。</div>
+      </div></div>
+      <div class="sec4 academic-sec"><div class="sn">04<span>CODE</span></div><div class="sec4-body">
+        <h2>How｜一段可以读懂的 Python 风格核心伪代码</h2>
+        <div class="code-card">
+          <div class="code-header"><span>PYTHON / PSEUDOCODE</span><span>AE + PHYSICAL RESIDUAL + HUMAN GATE</span></div>
+          <pre><code><span class="tok-comment"># 离线训练阶段：不同作业工况分别校准正常基线</span>
+<span class="tok-key">for</span> window <span class="tok-key">in</span> normal_windows:
+    x = standardize(window, stats[window.mode])
+    x_hat = autoencoder(x)
+    loss = ((x - x_hat) ** <span class="tok-num">2</span>).mean()
+    loss.backward()                <span class="tok-comment"># 训练 AE，而非学习事故标签</span>
+
+<span class="tok-comment"># 在线推理阶段：以下函数表示算法接口，需另行实现</span>
+<span class="tok-key">def</span> <span class="tok-fn">warn</span>(window, mode, autoencoder, baseline):
+    <span class="tok-key">if</span> mode == <span class="tok-str">'pump_off'</span>:
+        <span class="tok-key">return</span> <span class="tok-str">'使用停泵专用基线并核实返出'</span>
+    x = standardize(window, baseline[mode])
+    e_ae = normalize_ae(((x - autoencoder(x)) ** <span class="tok-num">2</span>).mean())
+    r_flow = flow_out(window) - flow_in(window)
+    r_pit  = pit_volume_slope(window)
+    r_phys = normalize_physics(r_flow, r_pit, window)
+    score = <span class="tok-num">100</span> * clip(<span class="tok-num">0.20</span> * e_ae + <span class="tok-num">0.80</span> * r_phys, <span class="tok-num">0</span>, <span class="tok-num">1</span>)
+    <span class="tok-key">return</span> score, rank_evidence(window), <span class="tok-str">'待司钻核实'</span></code></pre>
+        </div>
+        <div class="code-plain"><b>白话解释：</b>先用大多数正常数据教模型“正常循环应该长什么样”；当新的一段信号和正常模式不同，再去看出入口流量及池体积有没有对应变化。两边都提示异常，才把原因列出来交给司钻。代码是训练/推理框架示意；Tab 3 为保证完全离线运行，只使用<strong>明确标记的 AE 代理残差</strong>和机理规则，并没有真正训练神经网络。</div>
+      </div></div>
+      <div class="sec4"><div class="sn">05<span>SAFETY</span></div><div class="sec4-body"><h2>分级响应与质量门控</h2><table class="dtable"><thead><tr><th>级别</th><th>系统展示</th><th>人工动作</th></tr></thead><tbody><tr><td>正常 / 观测</td><td>维持监测、显示工况</td><td>巡检数据质量</td></tr><tr><td>注意（黄）</td><td>异常分数增大、列出关联通道</td><td>核对作业状态和仪表</td></tr><tr><td>警戒（红）</td><td>持续异常 + 机理一致性证据</td><td>核实工况并按井控程序决策</td></tr></tbody></table><p class="small muted">所有级别均为演示算法标签，不是实际井控报警等级或现场处置指令。</p></div></div>
+      <div class="sec4"><div class="sn">06<span>HUMAN</span></div><div class="sec4-body"><h2>记录决策比简单“确认”更重要</h2><p>驳回时应记录“接单根”或“传感器干扰”等原因；确认时记录证据、当时工况和选择的措施。后续可用人工反馈构建质量受控的困难样本库，或将结果映射为离线强化学习奖励；<strong>本演示不进行在线强化学习，也不控制真实设备</strong>。</p><div class="callout">Human-in-the-loop：报警负责提出可核查的假设，司钻负责对实际井况作最终判断。</div></div></div>
+    </section>
+
+    <section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+      <div class="eyebrow">LIVE LAB / HYBRID ANOMALY DETECTION & EXPLAINABILITY</div>
+      <h2 class="lab-title">井下复杂前兆识别控制台 <span>多变量异常检测 / XAI / 司钻核实</span></h2>
+      <p class="lead lab-lead">选择连续钻进、停泵、井漏、井涌或卡钻等情景，观察“条件基线 → 多通道偏离 → XAI 解释 → 人工核实”。评分和雷达图均为教学代理，人工确认不等于事故已经诊断或现场动作已执行。</p>
+      <div class="statebar" id="statebar" role="status" aria-live="polite"><span class="indicator" id="status-light"></span><b id="status-text">持续监测 · 当前无异常</b><span class="state-side" id="state-level">NORMAL / 正常</span></div>
+      <div class="control-strip card">
+        <div class="control-section"><div class="card-h"><strong>情景与检测条件</strong><span>SIMULATION INPUT</span></div>
+          <label class="field-title" for="scenario">选择教学场景</label>
+          <select id="scenario"><option value="normal">正常连续钻进</option><option value="connection">接单根 / 停泵（工况干扰）</option><option value="loss">井漏前兆（返出量减少）</option><option value="kick">气侵前兆（返出量增加）</option><option value="stuck" selected>卡钻前兆（自动演示）</option></select>
+        </div>
+        <div class="control-section"><div class="card-h"><strong>预警策略</strong><span>MODEL POLICY</span></div>
+          <div class="field-title"><span>检测灵敏度</span><output id="sense-value">标准</output></div>
+          <input type="range" id="sensitivity" min="0" max="2" step="1" value="1" aria-label="检测灵敏度"/>
+          <div class="range-hint"><span>稳健（少误报）</span><span>灵敏（早发现）</span></div>
+        </div>
+        <div class="control-section compact"><div class="card-h"><strong>教学试验</strong><span>DATA QUALITY</span></div>
+          <div class="action-grid"><button type="button" id="disturb" class="btn ghost">↯ 模拟传感器干扰</button><button type="button" id="reset" class="btn ghost">↺ 重置基线</button></div>
+        </div>
+      </div>
+      <div class="kpis"><div><small>融合异常分数</small><b id="k-score">0</b><span>/ 100 分</span></div><div><small>水力平衡残差</small><b id="k-balance">0.0</b><span>L/s</span></div><div><small>活跃工况</small><b id="k-mode">卡钻前兆</b></div><div><small>人工反馈</small><b id="k-feedback">0</b><span>条</span></div></div>
+      <div class="lab-grid academic-lab-grid">
+        <div class="lab-left">
+          <div class="card plot-card"><div class="card-h"><strong>多通道监测 / 实时滚动</strong><span>四条独立刻度 · 0.8 s / 模拟分钟</span></div>
+            <svg id="signals" viewBox="0 0 900 390" role="img" aria-label="扭矩、立管压力、返出流量、池体积的四条实时曲线，包含中文轴标签与分钟时间坐标" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="legend"><span><i style="background:#b26a39"></i>扭矩 kN·m</span><span><i style="background:#41699b"></i>立管压力 MPa</span><span><i style="background:#2f7d6b"></i>返出流量 L/s</span><span><i style="background:#7e5a8d"></i>池体积 m³</span></div>
+            <figcaption class="fig-caption"><b>图 3</b><span>四个物理通道的独立纵轴（均标单位）；右端是“现在”，时刻按教学模拟时间滚动。联合检测不代表对事故的充分诊断。</span></figcaption>
+          </div>
+          <!-- AI 特征空间：与曲线同一帧更新，五个通道共用归一化偏离半径 -->
+          <figure class="card radar-card" aria-labelledby="radar-heading">
+            <div class="card-h"><strong id="radar-heading">AI 特征空间与基线偏离</strong><span>FEATURE SPACE DEVIATION</span></div>
+            <p class="radar-desc">模型将五个传感器维度映射到同一特征空间。<b>青玉色五边形</b>是教学正常区域，<b>动态多边形</b>是当前偏离程度；越出正常区域意味着值得人工核实。</p>
+            <svg id="feature-radar" viewBox="0 0 580 340" role="img" aria-label="五维偏离雷达图，扭矩、立压、流量、池体积和转速。青玉色代表正常基线区，橙红色代表当前传感器联合偏离" xmlns="http://www.w3.org/2000/svg">
+              <title>多变量特征空间偏离：正常基线与当前动态特征对比</title>
+              <desc>五维标准化偏离强度，外侧为偏离越大；图表不代表事故概率。</desc>
+              <g id="radar-grid" aria-hidden="true"></g>
+              <polygon id="radar-baseline" points="" fill="#e6f1ec" fill-opacity=".76" stroke="#2f7d6b" stroke-width="2" stroke-dasharray="5 4"/>
+              <polygon id="radar-current" points="" fill="#b26a39" fill-opacity=".16" stroke="#b26a39" stroke-width="3" stroke-linejoin="round"/>
+              <g id="radar-points" aria-hidden="true"></g>
+              <g id="radar-axis-labels" aria-hidden="true"></g>
+              <text x="290" y="328" text-anchor="middle" font-size="10.5" fill="#79828a">标准化偏离强度（0–1，向外增大）</text>
+            </svg>
+            <div class="radar-legend"><span><i class="radar-key baseline"></i>正常基线范围</span><span><i class="radar-key current" id="radar-legend-current"></i>当前实时特征</span><strong id="radar-state">联合偏离：正常</strong></div>
+            <figcaption class="fig-caption"><b>图 5</b><span>在多维空间中，单看某一通道可能正常，但联合分布已偏离基线。采用教学标准化残差和融合分数，非训练所得真实特征空间。</span></figcaption>
+          </figure>
+          <div class="card inference-card">
+            <div class="card-h"><strong>AI 推理依据 · 动态诊断网格</strong><span>INFERENCE TRACE · LIVE</span></div>
+            <div class="inference-grid">
+              <div class="inference-cell"><span class="inference-icon" aria-hidden="true">◷</span><div><small>滚动工况对比窗口</small><b id="infer-window">10 点 / 10 模拟分钟</b></div></div>
+              <div class="inference-cell"><span class="inference-icon" aria-hidden="true">▦</span><div><small>相似片段检索（模拟）</small><b id="infer-match">142 次匹配</b></div></div>
+              <div class="inference-cell"><span class="inference-icon" aria-hidden="true">∑</span><div><small>标准化重构误差代理</small><b id="infer-recon">0.00</b></div></div>
+              <div class="inference-cell"><span class="inference-icon" aria-hidden="true">≋</span><div><small>水力 / 机理残差融合</small><b id="infer-physics">0.00</b></div></div>
+            </div>
+            <div class="inference-progress" aria-label="当前推理阶段"><span class="active">① 感知</span><span>② 建模</span><span>③ 解释</span></div>
+            <p class="inference-caption" id="infer-summary">正在对比历史窗口与当前工况，持续检验多通道联合偏离。</p>
+            <p class="micro">以上数字是<strong>合成代理模型的推理过程演示</strong>，并非已训练 AE/Isolation Forest 的真实检索统计。</p>
+          </div>
+          <div class="card trace-note"><b>AI 如何服务司钻？</b><p>AI 把多通道弱信号汇聚为可核实的证据，并通过 XAI 指出“哪条曲线、为何偏离”。模型只负责提出假设；司钻结合振动、返砂和现场作业记录作最终研判。</p></div>
+        </div>
+        <div class="lab-right">
+          <div class="card score-card"><div class="card-h"><strong>AI 异常分数仪表</strong><span id="score-threshold">注意 50 · 警戒 80</span></div>
+            <div class="gauge-layout"><svg id="arc-gauge" viewBox="0 0 340 188" role="img" aria-label="异常分数 0 至 100 的半圆形指针仪表，80分以上显示红色警戒" xmlns="http://www.w3.org/2000/svg"><path d="M36 145 A134 134 0 0 1 304 145" fill="none" stroke="#e9e4d8" stroke-width="18" stroke-linecap="round"/><path d="M36 145 A134 134 0 0 1 210 17" fill="none" stroke="#2f7d6b" stroke-width="14" stroke-linecap="round"/><path d="M210 17 A134 134 0 0 1 278 64" fill="none" stroke="#b26a39" stroke-width="14" stroke-linecap="round"/><path d="M278 64 A134 134 0 0 1 304 145" fill="none" stroke="#b05a51" stroke-width="14" stroke-linecap="round"/><line id="gauge-needle" x1="170" y1="145" x2="36" y2="145" stroke="#242b2e" stroke-width="3.5" stroke-linecap="round"/><circle cx="170" cy="145" r="9" fill="#242b2e" stroke="white" stroke-width="3"/><text x="28" y="168" fill="#79828a" font-size="12">0</text><text x="304" y="168" fill="#79828a" font-size="12">100</text><text id="score-number" x="170" y="112" font-size="32" font-weight="700" fill="#242b2e" text-anchor="middle">0</text><text x="170" y="134" fill="#79828a" font-size="11" text-anchor="middle">异常程度 / 100 分</text></svg>
+            </div>
+            <svg id="scores" viewBox="0 0 900 155" role="img" aria-label="异常分数随模拟分钟变化曲线，具有中文横纵轴和分级警戒水平线" xmlns="http://www.w3.org/2000/svg"></svg>
+            <figcaption class="fig-caption"><b>图 4</b><span>分数为融合异常强度，非真实事故概率；超过 80 分进入红色警戒。司钻驳回不永久静音持续风险。</span></figcaption>
+          </div>
+          <div class="card explain-card" id="explain-card"><div class="card-h"><strong>XAI · 预警解释与证据排序</strong><span>WHY ALERT?</span></div>
+            <div class="xai-title" id="xai-title">当前无持续联合异常</div><p id="xai-body">分析流量平衡、池体积、立压和扭矩相对基线的偏离。</p>
+            <div class="evidence-label">异常贡献强度（教学规则代理，非事故概率）</div><div id="evidence-list" class="evidence-list"><div class="empty-evidence">等待新样本…</div></div><div class="xai-foot" id="xai-strength">模式匹配强度 —</div>
+          </div>
+          <div class="card warnings-card"><div class="card-h"><strong>分级预警列表</strong><span>ALERT EVENTS</span></div><ul id="warnings-list" class="warnings-list" aria-live="polite"><li class="neutral">暂无待核实预警；持续监控中。</li></ul></div>
+          <div class="handoff-line" aria-label="人机接力：机器负责多维融合预警，司钻拥有最终决策权">
+            <div class="handoff-end machine"><small>AI / MACHINE</small><strong>机器：多维融合预警</strong><span>风险分级 · XAI 证据</span></div>
+            <div class="handoff-arrow" aria-hidden="true"><span>→</span><small>授权交接</small></div>
+            <div class="handoff-end person"><small>HUMAN / DRILLER</small><strong>人类：最终决策</strong><span>核实 · 干预 · 标注</span></div>
+            <div class="handoff-status" id="handoff-state">待司钻结合现场观察确认，AI 不自动执行</div>
+          </div>
+          <div class="card human-card"><div class="card-h"><strong>司钻决策门 · HUMAN</strong><span>FINAL AUTHORITY</span></div>
+            <div class="human-caption"><strong>人工复核是必须经过的交接门。</strong> AI 输出异常分数与证据，而不是井控指令；司钻结合实际工况与既定井控程序决定下一步。</div>
+            <button type="button" id="confirm" class="btn primary">✓ 确认干预（降钻压 / 提转速）</button><button type="button" id="dismiss" class="btn secondary">× 标记为误报（传感器干扰）</button>
+            <p class="micro" id="action-hint">模拟将自动逐步出现卡钻前兆；需由司钻核实并点击，才会触发教学处置反馈。</p>
+            <div class="baseline-version" id="baseline-version">教学基线校准：v1.00 · 待人工标注</div>
+          </div>
+          <div class="card academic-evaluation">
+            <div class="card-h"><strong>模型评价与失效边界</strong><span>SAFETY METRICS · FIELD VALIDATION</span></div>
+            <div class="eval-metrics"><div><small>召回率</small><b>事件级</b><span>是否抓住真正事故</span></div><div><small>误报率</small><b>工况分层</b><span>每小时 / 每次接单根</span></div><div><small>提前量</small><b>时间差</b><span>预警至事件确认</span></div></div>
+            <p>模型输出应与传统阈值基线在<strong>相同井段、相同工况</strong>下比较；本页合成分数仅用于解释机制，不代表已验证的召回率或现场井控能力。</p>
+          </div>
+        </div>
+      </div>
+      <!-- 审计日志移到双栏容器外，宽度不再决定右栏高度 -->
+      <section class="card log-card log-wide" aria-labelledby="audit-heading"><div class="card-h"><strong id="audit-heading">人机反馈 / 审计记录</strong><span>HUMAN → AI FEEDBACK · FULL WIDTH</span></div>
+        <div class="audit-summary"><span>每条记录保留<strong>时间、人工操作、场景、评分及传感器值</strong>。</span><span><i class="audit-indicator"></i> 最近 <b id="audit-count">0</b> 条（本页会话）</span></div>
+        <ol id="audit-log" aria-live="polite"><li class="empty-log">暂无人工审核记录；确认、误报标注、切换工况以及质量干扰将记录时间和参数。</li></ol>
+      </section>
+      <p class="lab-disclaimer">安全声明：本案例为离线教学合成模拟，绝不连接钻机，也不替代井控程序、现场指挥或专业判断。井漏、气侵和卡钻具有多种成因，演示的规则并非充分诊断条件；任何真实处置均须依照适用规程执行。</p>
+    </section>
+  </main>
+  <footer class="doc-foot"><span>Petro × AI Atlas · Drilling AI Case Study</span><span>Explainable warning → Driller verification → Auditable feedback</span></footer>
+</div>
+<script src="demo.js"></script>
+</body></html>

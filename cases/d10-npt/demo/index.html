@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="钻井非生产时间 NPT 智能分析：日报文本解析、未来风险预测与平台经理人工授权教学案例。">
+  <title>钻井非生产时间 NPT 智能分析 · Petro × AI Atlas</title>
+  <link rel="stylesheet" href="demo.css">
+  <script src="demo.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <header class="doc-head">
+    <nav class="crumb" aria-label="页面层级"><span>总览</span><b>/</b><span>作业链</span><b>/</b><span>钻井</span><b>/</b><strong>钻井非生产时间 NPT 智能分析</strong></nav>
+    <div class="dh-kicker"><span class="tag">环节 03 · 钻井</span><span class="tag method">NLP + 生存分析</span><span class="tag case"><i class="tag-dot"></i>案例 d10-npt · v1.0.0</span></div>
+    <h1 class="dh-title">钻井非生产时间 NPT 智能分析</h1>
+    <p class="dh-sub">将自由文本钻井日报转换为可核验的事件台账，再把工况特征映射为未来 12/24 小时的 NPT 风险。<b>AI 是信息整理与风险提示工具，平台经理负责确认事件归类和采取何种干预。</b></p>
+    <div class="dh-tags"><span class="dtag" data-d="高">● 难度 高</span><span class="tag">D10</span><span class="tag pale">NER · Risk Forecast · Human-in-the-loop</span></div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="案例三个板块">
+    <button type="button" class="tab active" id="tab-bg" data-tab="bg" role="tab" aria-selected="true" aria-controls="panel-bg"><span>01</span> 专业背景</button>
+    <button type="button" class="tab" id="tab-flow" data-tab="flow" role="tab" aria-selected="false" aria-controls="panel-flow"><span>02</span> 案例流程</button>
+    <button type="button" class="tab" id="tab-demo" data-tab="demo" role="tab" aria-selected="false" aria-controls="panel-demo"><span>03</span> 交互演示</button>
+  </nav>
+
+  <main>
+    <section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+      <div class="eyebrow">01 / ENGINEERING CONTEXT · WHY NLP WORKS</div>
+      <h2 class="panel-title">一天的钻井日报，为什么不能只靠手工统计？</h2>
+      <p class="lead">“井漏、循环观察、等钻具、设备检修”可能散落在自由文本里。仅靠关键词检索无法分清事件、工序、持续时间和是否属于非计划停工；也难把日报与立压、井深、设备状态对齐形成提前预警。</p>
+      <div class="judge">
+        <div><small>数据形态</small><b>文本 + 时序</b><span>日报、泵压、井深、工况</span></div>
+        <div><small>标注成本</small><b>高</b><span>NPT 类别、开始结束时间需复核</span></div>
+        <div><small>可见收益</small><b>可追溯决策</b><span>减少漏记、便于复盘预防</span></div>
+        <div><small>工程难度</small><b>高</b><span>行业术语、样本偏斜、跨井迁移</span></div>
+      </div>
+
+      <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec-body">
+        <h3>有日报，不等于有可分析的 NPT 台账</h3>
+        <p>现场常记载“10:00–12:00 因井漏暂停钻进，配泥浆并循环观察”，但系统若只保留这句文字，就难以自动统计持续时间、归因和干预效果。<strong>非生产时间（NPT）通常指非计划的故障、异常或停工时间，不等于所有没有进尺的正常计划作业</strong>；例如计划中的下套管和常规起下钻未必归入 NPT。</p>
+        <p>不同区块和项目的 NPT 比例差异很大，不能将“20%–30%”当作所有井的普遍事实。本图使用<strong>合成的 24 小时作业分布</strong>，只说明损失怎样被拆分和可视化。</p>
+        <figure class="paper-figure"><div class="figure-head"><strong>钻井日作业时间与 NPT 构成</strong><span>ILLUSTRATIVE DAY · 24 H</span></div>
+          <svg viewBox="0 0 860 300" role="img" xmlns="http://www.w3.org/2000/svg" aria-label="一个模拟24小时钻井日报中，生产钻进17小时、计划作业3小时、非生产时间4小时；非生产时间包含井漏2小时和等待钻具2小时">
+            <rect x="20" y="19" width="820" height="262" rx="8" fill="#fdfcf9" stroke="#e9e4d8"/>
+            <text x="50" y="52" font-size="13" font-weight="600" fill="#384448">24 h 作业构成（教学样本）</text>
+            <g stroke="#e9e4d8" stroke-dasharray="3 5"><path d="M66 75V215M244 75V215M423 75V215M601 75V215M780 75V215"/></g>
+            <rect x="66" y="101" width="506" height="50" fill="#2f7d6b" rx="3"/>
+            <rect x="572" y="101" width="89" height="50" fill="#b26a39"/>
+            <rect x="661" y="101" width="119" height="50" fill="#b05a51" rx="3"/>
+            <text x="319" y="123" text-anchor="middle" fill="white" font-size="15" font-weight="700">钻进 / 生产 17 h</text>
+            <text x="319" y="141" text-anchor="middle" fill="white" font-size="11">70.8%</text>
+            <text x="617" y="123" text-anchor="middle" fill="white" font-size="11" font-weight="600">计划</text>
+            <text x="617" y="139" text-anchor="middle" fill="white" font-size="10">3 h</text>
+            <text x="720" y="123" text-anchor="middle" fill="white" font-size="13" font-weight="700">NPT 4 h</text>
+            <text x="720" y="141" text-anchor="middle" fill="white" font-size="10">16.7%</text>
+            <g fill="#79828a" font-size="11" text-anchor="middle"><text x="66" y="169">0</text><text x="244" y="169">6</text><text x="423" y="169">12</text><text x="601" y="169">18</text><text x="780" y="169">24</text></g>
+            <text x="423" y="189" text-anchor="middle" fill="#4d565b" font-size="11">作业累计时间 / h</text>
+            <rect x="66" y="216" width="9" height="9" fill="#2f7d6b" rx="1"/><text x="81" y="224" fill="#4d565b" font-size="10.5">生产钻进（17 h）</text>
+            <rect x="260" y="216" width="9" height="9" fill="#b26a39" rx="1"/><text x="275" y="224" fill="#4d565b" font-size="10.5">计划作业（3 h）</text>
+            <rect x="453" y="216" width="9" height="9" fill="#b05a51" rx="1"/><text x="469" y="224" fill="#4d565b" font-size="10.5">非计划 NPT（4 h）</text>
+            <text x="67" y="254" fill="#79828a" font-size="10.5">其中 NPT 分项：井漏相关停工 2 h ｜ 等待钻具 2 h（仅示例，归类需审核）</text>
+          </svg>
+          <figcaption>图 1｜合成井日报的 24 小时构成。NPT 为非计划停工的示意子集，不包含所有正常计划性非钻进作业；数值不代表行业平均水平。</figcaption>
+        </figure>
+        <div class="refs">相关研究：<a href="https://doi.org/10.2118/214522-MS" target="_blank" rel="noopener noreferrer">SPE-214522-MS｜日报工序代码 NLP 自动映射</a>；<a href="https://doi.org/10.1016/j.petrol.2021.108939" target="_blank" rel="noopener noreferrer">Cinelli 等（2021）｜从日报自动提取事故事件</a>。</div>
+      </div></div>
+
+      <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec-body">
+        <h3>先把“话”读懂，再判断“未来是否可能停工”</h3>
+        <p><strong>NLP 信息抽取：</strong>NER 识别时间、井深、事件名称、处理动作与明确记载的金额；事件分类模型进一步判断“井漏/等待钻具/设备问题”等类别。与简单关键词匹配相比，上下文模型可以区分“发生井漏”“排除井漏”“曾经井漏”这三种不同语义。</p>
+        <p><strong>风险建模：</strong>将审核后的历史事件与最新井深、地层、泵压波动、设备状态对应起来。可用 XGBoost 估计 12/24 小时内首次 NPT 风险，或用生存分析处理“观测结束前尚未发生事件”的右删失样本。模型必须经过跨井验证与概率校准，输出的是<strong>估计概率，不是必然发生</strong>。</p>
+        <div class="math-card"><div class="math-top">CROSS-ENTROPY / 事件分类的监督损失</div>
+          <div class="math-formula" role="math" aria-label="L 等于负的从 i 等于一到 C 的求和，y i 乘以 log y 帽 i"><i>ℒ</i><sub>CE</sub><span class="eq">= −</span><span class="sumblock"><span class="sup">C</span><span class="sum">∑</span><span class="sub">i=1</span></span><i>y</i><sub>i</sub> log(<span class="hat">ŷ</span><sub>i</sub>)</div>
+          <div class="math-legend"><div><b><i>y</i><sub>i</sub></b><small>人工审核的真实事件类别</small></div><div><b><span class="hat">ŷ</span><sub>i</sub></b><small>模型预测该类别的概率</small></div><div><b><i>C</i></b><small>事件分类的类别总数</small></div></div>
+          <p class="math-note">可以理解为“模型给正确答案分了多少把握”：真实类别概率越低，惩罚越大。这里的损失用于分类模型训练；<strong>时间和金额抽取还需要单独的实体标注与核对规则。</strong></p>
+        </div>
+      </div></div>
+
+      <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec-body">
+        <h3>从日报文本到可追溯样本：每条记录都要带时间和出处</h3>
+        <div class="table-wrap"><table class="dtable"><thead><tr><th>数据来源</th><th>主要字段</th><th>为什么需要</th></tr></thead><tbody>
+          <tr><td>钻井日报 DDR</td><td>原文、起止时间、事件、措施、日报编号</td><td>形成可核查的事件台账，不凭空生成损失金额</td></tr>
+          <tr><td>实时传感器</td><td>井深、立压、流量、扭矩、池体积、设备报警</td><td>提供事件前兆，避免单看文字造成信息滞后</td></tr>
+          <tr><td>井筒与地层</td><td>岩性、井斜、井段、泥浆窗口、邻井经验</td><td>控制模型在不同井段的预测偏差</td></tr>
+          <tr><td>成本与标签</td><td>实际作业成本、已审核 NPT 时长、是否发生事件</td><td>支持成本分析、概率校准和后续结果评估</td></tr>
+        </tbody></table></div>
+      </div></div>
+
+      <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec-body">
+        <h3>三个最难的地方：看懂行话、分清停工、预测可泛化</h3>
+        <p>“等钻具”“待工具”“设备候料”可能指同类事件；“循环观察”却可能是风险处理，也可能是既定工序。即使实体识别正确，是否计入 NPT 仍需结合施工计划、事件原因和人工审核。训练数据又存在正常时间远多于事故样本的问题，跨承包商报告格式和术语可能迁移失效。</p>
+        <div class="callout"><b>Human-in-the-loop：</b>AI 整理证据、给出预防建议，平台经理审核事件分类并选择是否干预。人工审核结果与随后真正发生或没有发生 NPT 的结果，作为可追溯样本进入离线训练与验证环节。</div>
+        <p class="small-note">更多资料：<a href="https://jpt.spe.org/ai-based-system-automates-textual-classification-of-daily-drilling-reports" target="_blank" rel="noopener noreferrer">SPE JPT（2024）｜日报文本智能分类</a>；<a href="https://doi.org/10.2118/228268-MS" target="_blank" rel="noopener noreferrer">SPE-228268-MS（2025）｜NPT 事件与根因分析</a>。以上论文用于方法背景，本教学页并未复现其训练模型。</p>
+      </div></div>
+    </section>
+
+    <section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+      <div class="eyebrow">02 / WORKFLOW · MACHINE ANALYZES, HUMAN AUTHORIZES</div>
+      <h2 class="panel-title">从“读日报”到“提前预防”的五步闭环</h2>
+      <p class="lead">这条流程并不是把日报丢给模型就自动管钻机；它先把文字转换成可靠数据，再输出有依据的 NPT 风险，最后由平台经理审核和行动。</p>
+      <div class="pipeline">
+        <article class="pipe"><div class="pipe-head"><span>01 / DATA</span><span class="pipe-symbol">▤</span></div><h3>日报数据采集</h3><p>输入：自由文本日报、井深、泵压、设备日志。</p><p>先核对时间格式和工况来源。</p><div class="pipe-foot">输出 → 可定位的原始事件片段</div></article>
+        <article class="pipe"><div class="pipe-head"><span>02 / NLP</span><span class="pipe-symbol">⌕</span></div><h3>实体抽取与归类</h3><p>从句子里抽取时间、事件、措施和明确的费用，判别是否属于 NPT。</p><div class="pipe-foot">输出 → 结构化事件台账</div></article>
+        <article class="pipe"><div class="pipe-head"><span>03 / RISK</span><span class="pipe-symbol">⌁</span></div><h3>未来风险预测</h3><p>结合最近井深、压力异常和设备状态，评估未来 12/24 h 的事件风险。</p><div class="pipe-foot">输出 → 概率、证据与建议</div></article>
+        <article class="pipe human"><div class="pipe-head"><span>04 / HUMAN</span><svg class="human-icon" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="8" r="4"/><path d="M6 27v-8a9 9 0 0 1 18 0v8M11 20v7m8-7v7"/></svg></div><h3>平台经理决策门</h3><p>复核天气、钻具供给、井控及设备状态。选择提前干预或忽略建议。</p><div class="pipe-foot">Human-in-the-loop · 人工授权</div></article>
+        <article class="pipe"><div class="pipe-head"><span>05 / AUDIT</span><span class="pipe-symbol">↺</span></div><h3>执行与结果回流</h3><p>登记动作和结果；后续是否发生 NPT，经过审核再用于模型校准。</p><div class="pipe-foot">输出 → 高质量人工标签</div></article>
+      </div>
+      <div class="handoff"><span>机器：抽取、估计与解释</span><strong>→ 机器建议 · 人工授权 →</strong><span>平台经理：现场研判与执行</span></div>
+      <div class="flow-grid">
+        <article class="card">
+          <div class="card-head"><strong>核心代码｜日报 NLP 实体抽取</strong><span>PYTHON-LIKE / NER + RISK</span></div>
+          <div class="code-card"><pre><code><span class="cm"># 说明性伪代码：真实任务需领域标注与微调</span>
+from spacy import load
+nlp = load("zh_core_web_sm")  <span class="cm"># 示例；领域数据需微调</span>
+report = "10:00-12:00 因井漏暂停钻进，配泥浆"
+doc = nlp(report)
+entities = [(e.text, e.label_) for e in doc.ents]
+entities += extract_domain_events(report) <span class="cm"># 井漏/措施规则</span>
+period = parse_time_interval(report)  <span class="cm"># 2.0 h</span>
+record = human_review(entities, period, npt_flag=True)
+
+<span class="cm"># 仅使用预测时刻之前已知的工况特征</span>
+features = join_telemetry(record, as_of=forecast_time)
+risk_12h = calibrated_model.predict_proba(features)[1]
+proposal = build_prevention_plan(risk_12h)
+<span class="hl">request_rig_manager_approval(proposal)  # 人先拍板</span></code></pre></div>
+          <p class="plain-explain"><b>翻译成人话：</b>先给每句日报贴上“几点开始、什么事故、做了什么”的标签，再与对应时刻的仪器数据匹配。模型算出下一段的风险，但必须让平台经理审核；未明确写出的费用不能自动编造。</p>
+        </article>
+        <article class="card">
+          <div class="card-head"><strong>为什么需要生存分析与概率校准？</strong><span>WHY RISK ESTIMATION WORKS</span></div>
+          <p>普通分类只能给出“这段样本有无事故”；生存分析还能描述“未来多久可能首次出现事件”，并妥善处理观察到一半时尚未发生事故的样本（右删失）。</p>
+          <div class="math-card compact"><div class="math-top">SURVIVAL / CUMULATIVE EVENT PROBABILITY</div><div class="math-formula small" role="math" aria-label="未来 h 小时首次事件概率等于一减去累计风险的指数"><i>P</i>(<i>T</i> ≤ <i>h</i> | <i>x</i>) = 1 − exp(−<i>H</i>(<i>h</i> | <i>x</i>))</div><p class="math-note"><i>H</i> 为累计风险强度，由井深、地层、泵压和设备状态决定。累积事件概率必须随预测时间窗延长而不下降；干预后的曲线是另一个预测情景，不是已实测的“降风险事实”。</p></div>
+          <div class="callout"><b>关键工程边界：</b>本演示实际使用正则表达式、领域词典和可解释的教学风险函数，不是已训练完成的 BERT、spaCy NER 或生存模型。真实部署还需要跨井验证、阈值设定、校准及工况漂移监测。</div>
+          <div class="flow-check"><span>信息不泄漏</span><span>事件归属审核</span><span>概率校准</span><span>人工授权</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+      <div class="eyebrow">03 / TEXT → EVENT → RISK → HUMAN DECISION</div>
+      <h2 class="panel-title">从一句钻井日报，看到未来 NPT 风险</h2>
+      <p class="lead">左侧演示文本实体识别、自动化事件台账与未来 24 h 风险；右侧保留人工审核和预防决策。所有比例、费用和风险数值均为教学假设。</p>
+      <div class="status" id="status" role="status" aria-live="polite"><span class="status-dot"></span><strong id="status-title">待解析日报 · 等待平台经理审核</strong><span id="status-detail">MONITORING</span></div>
+      <div class="lab-grid">
+        <div class="lab-left">
+          <article class="card parser-card">
+            <div class="card-head"><strong>钻井日报 NLP 解析器</strong><span>RAW TEXT → ENTITY HIGHLIGHT</span></div>
+            <label class="field-label" for="report-text">原始日报（可编辑后重新解析）</label>
+            <textarea id="report-text" spellcheck="false" rows="5">07:00-10:00 正常钻进至3160m，立压18.2MPa。
+10:00-12:00 因井漏暂停钻进，配泥浆并循环观察，估算停工损失2.4万元。
+13:00-14:30 等钻具到井场，暂停作业。
+16:00-17:00 泵压波动，检查泥浆泵（待核实是否计入NPT）。</textarea>
+            <div class="parser-toolbar"><button class="btn primary" type="button" id="parse-btn">一键 NLP 解析</button><button class="btn secondary" type="button" id="sample-btn">恢复示例日报</button><span class="hint" id="parser-message">等待识别时间、事件与处理措施</span></div>
+            <div class="highlight-output" id="highlight-output" aria-live="polite">解析后将展示原文高亮：<span class="entity time">时间</span>、<span class="entity event">异常</span>、<span class="entity action">措施</span>、<span class="entity cost">费用</span>。</div>
+            <div class="entity-legend"><span><i class="sw time"></i>时间</span><span><i class="sw event"></i>异常 / 事件</span><span><i class="sw action"></i>处理措施</span><span><i class="sw cost"></i>明确记载金额</span></div>
+            <p class="figcap">图 2｜自由文本日报的实体识别与语义高亮。时间与工序自动抽取后仍需人工核定 NPT 分类；只有文中写明的金额才会录入。</p>
+          </article>
+          <article class="card ledger-card">
+            <div class="card-head"><strong>事件台账 · 可人工修正 NPT 归属</strong><span>STRUCTURED DDR EVENTS</span></div>
+            <div class="table-wrap"><table class="dtable" id="event-table"><thead><tr><th>起止</th><th>事件 / 操作</th><th>时长</th><th>明确费用</th><th>人工归属</th></tr></thead><tbody id="event-body"><tr><td colspan="5" class="empty-row">请先点击“一键 NLP 解析”</td></tr></tbody></table></div>
+            <div class="ledger-foot"><span>已确认 NPT：<b id="npt-hours">0.0 h</b></span><span>待审核：<b id="unknown-count">0</b> 条</span><span>已提取金额：<b id="explicit-cost">0 元</b></span></div>
+          </article>
+          <article class="card chart-card">
+            <div class="card-head"><strong>未来 24 小时 NPT 累计发生概率</strong><span>SCENARIO FORECAST / NOT OBSERVED</span></div>
+            <svg id="risk-chart" viewBox="0 0 820 285" role="img" aria-label="横轴为预测未来0到24小时，纵轴为累计发生至少一次NPT事件的估计概率百分比；未干预与已授权干预的两条情景曲线"></svg>
+            <div class="legend"><span><i class="ln base"></i>未干预预测</span><span><i class="ln acted"></i>采取干预后情景</span><span><i class="ln threshold"></i>教学关注阈值</span></div>
+            <p class="figcap">图 3｜不同干预情景下的累计事件概率。曲线来自合成风险函数；未实施措施前，绿色曲线只是“如果采取措施”的假设对照。</p>
+          </article>
+          <article class="card small-chart-card"><div class="card-head"><strong>时段风险强度与关注时段</strong><span>HAZARD / 2-HOUR WINDOWS</span></div><svg id="hazard-chart" viewBox="0 0 820 180" role="img" aria-label="未来0到24小时分十二个两小时窗口的教学风险强度柱状图，纵轴为每小时风险强度"></svg><p class="figcap">图 4｜按 2 小时窗口显示模拟事件强度，辅助解释“风险集中在什么时候”；它与累计概率不是同一指标。</p></article>
+          <article class="card trace-card"><div class="card-head"><strong>AI 证据链 · 为什么不能把“词”直接当“预警”？</strong><span>TRACEABILITY / DATA QUALITY</span></div>
+            <div class="trace-grid"><div><b>01 原文有证据</b><span>日报记录了发生时间与处理动作；缺失金额不会自动填充。</span></div><div><b>02 分类可复核</b><span>“井漏”描述须结合是否停工，NPT 标签允许人工修订。</span></div><div><b>03 预测看历史</b><span>风险仅使用预测时刻已知的工况，不能偷看未来处置结果。</span></div></div>
+          </article>
+        </div>
+        <div class="lab-right">
+          <article class="card metric-card"><div class="card-head"><strong>当前生产信息 · 风险摘要</strong><span>OPERATING SNAPSHOT</span></div><div class="readouts">
+            <div><small>当前井深（教学）</small><b id="depth-out">3,160 m</b></div><div><small>压力波动偏差</small><b id="pressure-out">12%</b></div><div><small>未来 12 h NPT 风险</small><b id="p12-out">—</b></div><div><small>未来 24 h NPT 风险</small><b id="p24-out">—</b></div>
+          </div><p class="small-note">风险为合成概率，不等同于“必然卡钻”，也不能与已发生 NPT 时长直接相加。</p></article>
+          <article class="card ai-panel" id="ai-panel"><div class="card-head"><strong>AI Copilot · NPT 提前预警</strong><span>EXPLAINABLE ADVICE</span></div><div class="risk-chip" id="risk-chip">计算中</div><h3 id="ai-title">请先解析日报</h3><p id="ai-description">系统将结合文本归类、压力波动和设备状态生成风险解释。</p><div class="ai-evidence"><div><span>风险主因</span><strong id="evidence-1">—</strong></div><div><span>近日报信息</span><strong id="evidence-2">—</strong></div><div><span>建议动作</span><strong id="evidence-3">—</strong></div></div><p class="callout-note">AI 提供可审阅证据，不自动下达设备指令；“提前循环泥浆”等措施必须符合现场井控程序。</p></article>
+          <article class="card controls-card"><div class="card-head"><strong>未来工况假设 · 风险敏感性</strong><span>WHAT-IF PARAMETERS</span></div>
+            <label for="depth-input">井深 <output id="depth-value">3160 m</output></label><input type="range" min="2800" max="4200" step="20" value="3160" id="depth-input"><div class="range-ends"><span>2800 m</span><span>4200 m</span></div>
+            <label for="pressure-input">立压波动幅度 <output id="pressure-value">12%</output></label><input type="range" min="0" max="30" step="1" value="12" id="pressure-input"><div class="range-ends"><span>稳定</span><span>明显波动</span></div>
+            <label for="equipment-input">设备状态</label><select id="equipment-input"><option value="0">正常巡检</option><option value="1" selected>轻度异常，待复核</option><option value="2">明显故障征兆</option></select>
+            <p class="small-note">拖动参数实时预览风险；此处调的是模拟输入，不等于向现场下达操作。</p>
+          </article>
+          <article class="card action-card"><div class="card-head"><strong>平台经理 · 最终决策门</strong><span>HUMAN AUTHORIZATION</span></div>
+            <div class="handoff-mini"><span>机器：风险估计与建议</span><strong>→ 人工审核 →</strong><span>平台经理</span></div>
+            <p class="decision-note" id="decision-note">请核实天气、供应链、井控及设备情况；只有人工操作才会写入决策日志。</p>
+            <div class="actions"><button id="approve-btn" type="button" class="btn primary">采纳预警 · 提前干预</button><button id="ignore-btn" type="button" class="btn secondary">忽略预警 · 继续观察</button><button id="reset-btn" type="button" class="btn subtle">重置演示情景</button></div>
+            <div class="confirmation" id="confirmation" aria-live="polite">Human-in-the-loop：等待平台经理授权</div>
+          </article>
+          <article class="card evidence-card"><div class="card-head"><strong>工程师复核清单</strong><span>BEFORE ANY ACTION</span></div><ul class="checklist"><li>是否已核对 NPT 事件发生时间和归属？</li><li>井控异常是否已有独立的现场确认？</li><li>当前天气、设备、供应链是否支持措施？</li><li>预测结果是否超出历史训练工况范围？</li></ul><p class="small-note">“采纳”仅改变教学预测情景；不能据此推断现实世界一定避免了 NPT。</p></article>
+        </div>
+      </div>
+      <article class="card log-card"><div class="card-head"><strong>人机协同审计 · 人工修订与决策记录</strong><span>HUMAN → AUDIT → TRAINING QUEUE</span></div><div class="audit-summary"><span>待审核训练样本：<strong id="feedback-count">0</strong></span><span>演示模型：<strong id="model-version">rule-proxy v1.0</strong></span><span>决策状态：<strong id="decision-status">未授权</strong></span></div><ol id="audit-log"><li>系统就绪：等待日报解析和平台经理人工审核。</li></ol><p class="small-note">审计记录仅存于当前浏览器会话，不上传服务器；待审核样本需人工核实后才能进入正式模型训练。</p></article>
+      <div class="bottom-note"><b>教学边界：</b>解析器采用中文关键词与正则规则，预测使用可解释的合成风险强度函数；页面并未调用已训练的工业 NER、BERT、XGBoost 或生存模型。所有 NPT 风险、避免损失和预防效果均不得用于真实施工决策。</div>
+    </section>
+  </main>
+  <footer><span>Petro × AI Atlas · D10 / Drilling NPT Analytics</span><span>可视化教学案例 · 仅模拟，不连接现场控制系统</span></footer>
+</div>
+</body>
+</html>

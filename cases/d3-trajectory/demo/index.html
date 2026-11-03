@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light">
+<title>井眼轨迹智能控制 · Petro × AI Atlas</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="site-wrap">
+<header class="doc-head">
+  <nav class="crumb" aria-label="页面层级"><span>总览</span><i>/</i><span>作业链</span><i>/</i><span>钻井</span><i>/</i><strong>井眼轨迹智能控制</strong></nav>
+  <div class="dh-kicker"><span class="tag stage-tag">环节 03 · 钻井</span><span class="tag method-tag">MPC 预测控制</span><span class="tag method-tag">OPT 参数优化</span><span class="tag case-tag"><i class="live-dot"></i>案例 d3-trajectory · v1.1.0</span></div>
+  <h1 class="dh-title">井眼轨迹智能控制</h1>
+  <p class="dh-sub">随钻测量提供滞后且存在误差的井眼姿态观测，系统辨识估计局部造斜规律，模型预测控制（MPC）则回答：<b>不纠偏会走向哪里？采用建议又会怎样？</b> AI 是导航仪，工程师才是驾驶员；工具面和滑动段长必须经过人工授权。</p>
+  <div class="dh-tags"><span class="dtag" data-d="高">● 难度 高</span><span class="tag">D3</span><span class="tag subtle">系统辨识 · 滚动优化 · Human-in-the-loop</span></div>
+</header>
+<nav class="tabs" role="tablist" aria-label="案例三大板块">
+  <button type="button" class="tab on" id="tab-bg" role="tab" data-tab="bg" aria-selected="true" aria-controls="panel-bg"><span class="tab-no">01</span> 专业背景</button>
+  <button type="button" class="tab" id="tab-flow" role="tab" data-tab="flow" aria-selected="false" aria-controls="panel-flow"><span class="tab-no">02</span> 案例流程</button>
+  <button type="button" class="tab" id="tab-demo" role="tab" data-tab="demo" aria-selected="false" aria-controls="panel-demo"><span class="tab-no">03</span> 交互演示</button>
+</nav>
+<main>
+<section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+  <div class="judge"><div class="jc"><span>数据形态</span><b>轨迹 + 控制序列</b><small>井斜 / 方位 / 工具面 / 井深</small></div><div class="jc"><span>标注成本</span><b>中—高</b><small>控制执行与工况对齐</small></div><div class="jc"><span>可见收益</span><b>减少无效纠偏</b><small>靶区命中与平滑轨迹</small></div><div class="jc"><span>技术难度</span><b>高</b><small>响应漂移、延迟和硬约束</small></div></div>
+  <div class="lede-block"><span class="eyebrow">背景 / DRILLING TRAJECTORY</span><p>随钻测量（MWD）通常是离散测点，工具面控制的效应存在井下延迟与岩性扰动。工程师既要让钻头命中靶区，还要限制狗腿度、摩阻、工具负荷和滑动段比例。<b>靶区命中不是唯一目标，平滑与安全同样重要。</b></p></div>
+  <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec4-body">
+    <h2>轨迹偏离不是单次失误，而是持续累积的曲率误差</h2>
+    <p>在长水平段与大斜度井，弯壳体马达的工具面方向与滑动段长共同决定可控曲率；但真实响应还取决于 BHA 刚度、钻头侧向切削力、井壁接触、层理倾角和岩石各向异性。不同层段的自然造斜或走向漂移（formation tendency / bit walk）会变化，不能仅用几何圆弧推算未来轨迹。<a class="ref-link" href="https://doi.org/10.2118/194727-MS" target="_blank" rel="noopener noreferrer">[1] SPE-194727-MS</a></p>
+    <p><b>两类“滞后”必须区分：</b>一是 MWD 测斜仪器到钻头具有空间间距，测到的是钻头后方的状态；二是测点间隔、井下信号上传与钻具响应形成时间或进尺上的反馈迟延。若工程师只根据最新测点的当前偏差执行单步大幅调整，可能在后续才发现修正过度。井眼一旦钻成，不能像车辆转弯那样撤销已经形成的曲率，纠偏代价会累积。<a class="ref-link" href="https://doi.org/10.2118/170861-PA" target="_blank" rel="noopener noreferrer">[2] SPE-170861-PA</a></p>
+    <div class="engineering-note"><b>现场约束不是一个 DLS 数字。</b> 大狗腿段可能使旋转钻柱承受更强的弯曲接触，并使扭矩与拖曳负荷变得敏感；实际摩阻受法向接触力、摩擦系数、井斜、张力、BHA 结构和井眼清洁等共同影响，<em>不能认为扭矩与 DLS 始终呈固定二次关系</em>。优化器应以批准的三维狗腿度限值、工具能力、摩阻与扭矩计算共同筛选候选。</div>
+    <figure class="paper-figure"><div class="figure-head"><b>井眼二维投影：设计直线与实际曲线发生偏离</b><span>WELLBORE CROSS-SECTION · SCHEMATIC</span></div>
+      <svg viewBox="0 0 880 332" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="纵轴井深米，横轴相对横向位置米，灰色设计直线、青玉实际弯曲井眼、下部绿色靶区和狗腿变化标识">
+        <rect x="85" y="34" width="710" height="238" rx="5" fill="#fcfbf7"/><path d="M85 100H795M85 170H795M85 238H795" stroke="#e9e4d8" stroke-dasharray="4 6"/><path d="M85 34V272H795" stroke="#9ba3a9" fill="none"/>
+        <path d="M85 105H795" stroke="#e6daca" stroke-width="20" opacity=".32"/><path d="M85 205H795" stroke="#e6daca" stroke-width="20" opacity=".32"/>
+        <rect x="496" y="235" width="95" height="37" rx="3" fill="#e6f1ec" stroke="#2f7d6b" stroke-dasharray="4 4"/>
+        <path d="M300 38L542 270" stroke="#9ba3a9" stroke-width="2.6" stroke-dasharray="8 6" fill="none"/>
+        <path d="M300 38C360 78 486 108 441 152S463 220 628 265" stroke="#2f7d6b" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M441 152L506 152M441 147V157M506 147V157" stroke="#b05a51" stroke-width="2" fill="none"/>
+        <g font-family="system-ui,sans-serif" font-size="12" fill="#4d565b"><text x="85" y="22">相对横向位置 / m</text><text x="28" y="38">井深 / m</text><text x="49" y="42">3000</text><text x="49" y="174">3150</text><text x="49" y="270">3300</text><text x="300" y="294" text-anchor="middle">−30</text><text x="542" y="294" text-anchor="middle">0</text><text x="771" y="294" text-anchor="middle">+30</text><text x="582" y="230" fill="#235f51">目标靶窗</text><text x="512" y="141" fill="#b05a51">横向偏离</text><text x="660" y="256" fill="#235f51">可能脱靶</text></g>
+        <path d="M105 315H144" stroke="#9ba3a9" stroke-width="2" stroke-dasharray="6 4"/><text x="151" y="319" fill="#4d565b" font-size="11">设计轨迹</text><path d="M290 315H328" stroke="#2f7d6b" stroke-width="3"/><text x="336" y="319" fill="#4d565b" font-size="11">实钻轨迹</text><rect x="475" y="307" width="23" height="14" fill="#e6f1ec" stroke="#2f7d6b"/><text x="509" y="319" fill="#4d565b" font-size="11">靶区</text>
+      </svg><figcaption><b>图 1</b><span>井眼偏离的二维投影示意。反复纠偏会造成“钟摆式”轨迹摆动，而地层的自然造斜偏置可能使轨迹持续漂移。实际三维井眼应同时检查井斜、方位及三维靶区。</span></figcaption>
+    </figure>
+    <figure class="paper-figure force-figure"><div class="figure-head"><b>斜层面与钻头侧向作用：为什么造斜规律不是常数</b><span>ANISOTROPY / BIT–ROCK INTERACTION</span></div>
+      <svg viewBox="0 0 880 290" role="img" aria-label="斜向地层层理、钻头侧向作用和自然偏转示意，含井深坐标、横向位置和中文图例">
+        <defs><marker id="force-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#b26a39" stroke-width="1.2"/></marker><marker id="steer-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#2f7d6b" stroke-width="1.2"/></marker></defs>
+        <rect x="62" y="25" width="740" height="207" fill="#fdfcf9" rx="4"/>
+        <g stroke="#d5c7ae" stroke-width="13" opacity=".46"><path d="M65 115L805 25"/><path d="M65 160L805 70"/><path d="M65 205L805 115"/><path d="M65 250L805 160"/></g>
+        <g stroke="#e9e4d8" stroke-dasharray="4 6"><path d="M62 77H802M62 129H802M62 181H802"/></g>
+        <path d="M62 25V232H802" fill="none" stroke="#9ba3a9"/>
+        <path d="M400 24Q417 93 429 156Q449 199 486 230" fill="none" stroke="#2f7d6b" stroke-width="10" opacity=".17"/>
+        <path d="M400 24Q417 93 429 156Q449 199 486 230" fill="none" stroke="#2f7d6b" stroke-width="3.5"/>
+        <g transform="translate(465 205) rotate(-28)"><rect x="-11" y="-29" width="22" height="46" rx="5" fill="#4d565b"/><path d="M-14 16L0 30L14 16" fill="#79828a" stroke="#242b2e" stroke-width="2"/></g>
+        <path d="M470 185L535 140" stroke="#b26a39" stroke-width="3" marker-end="url(#force-arrow)"/><path d="M463 182L427 122" stroke="#2f7d6b" stroke-width="3" marker-end="url(#steer-arrow)"/>
+        <path d="M402 25L402 227" stroke="#9ba3a9" stroke-dasharray="6 5" stroke-width="2"/>
+        <g font-size="12" fill="#4d565b"><text x="62" y="15">相对横向位置 / m</text><text x="17" y="36">测深 MD / m</text><text x="548" y="138" fill="#9a602f">地层侧向扰动</text><text x="300" y="111" fill="#235f51">工具面控制作用</text><text x="495" y="214" fill="#235f51">偏转后井眼</text><text x="72" y="218" fill="#9a602f">倾斜地层层理</text><text x="434" y="252" text-anchor="middle">横向距离 →</text><text x="20" y="175">深度 ↓</text></g>
+        <path d="M85 273H122" stroke="#9ba3a9" stroke-width="2" stroke-dasharray="5 4"/><text x="129" y="277" font-size="11" fill="#4d565b">理想方向</text><path d="M292 273H329" stroke="#2f7d6b" stroke-width="3"/><text x="336" y="277" font-size="11" fill="#4d565b">真实井眼</text><path d="M502 273H539" stroke="#b26a39" stroke-width="3"/><text x="546" y="277" font-size="11" fill="#4d565b">自然偏转/各向异性</text>
+      </svg><figcaption><b>图 2</b><span>受力示意而非定量力学分析：地层倾角与各向异性、钻具刚度及井壁接触共同决定侧向偏置。同一工具面在不同井段的实际效果可能改变，因此需要持续辨识。</span></figcaption>
+    </figure>
+  </div></div>
+  <div class="sec4 literature-section"><div class="sn">REF<span>REFERENCES</span></div><div class="sec4-body">
+    <h2>可核验的工业研究依据</h2>
+    <div class="reference-list">
+      <a class="reference-item" href="https://doi.org/10.2118/194727-MS" target="_blank" rel="noopener noreferrer"><b>[1] SPE-194727-MS</b><span>An Automated Trajectory Control for Drilling Operations · 2019。轨迹自动控制中的非线性、延迟与不确定性。</span></a>
+      <a class="reference-item" href="https://doi.org/10.2118/170861-PA" target="_blank" rel="noopener noreferrer"><b>[2] SPE-170861-PA</b><span>Wellbore-Trajectory Control by Use of Minimum Well-Profile-Energy Criterion for Drilling Automation · 2016。井眼曲率与轨迹能量的优化观念。</span></a>
+      <a class="reference-item" href="https://doi.org/10.2118/227896-MS" target="_blank" rel="noopener noreferrer"><b>[3] SPE-227896-MS</b><span>Enhancing Automated Sliding Performance Through the Integration of Physics Models and Machine Learning Algorithms · 2025。物理模型与机器学习的滑动控制融合。</span></a>
+      <a class="reference-item" href="https://doi.org/10.1016/j.jprocont.2025.103577" target="_blank" rel="noopener noreferrer"><b>[4] Journal of Process Control, 2025</b><span>Real time multi-inputs multi-outputs economic model predictive control for directional drilling based on fast modeling and sensor fusion。MPC 与状态估计的研究案例。</span></a>
+      <a class="reference-item" href="https://doi.org/10.2118/217707-MS" target="_blank" rel="noopener noreferrer"><b>[5] SPE-217707-MS</b><span>Facilitating Directional Drilling Work to Reach the Target Entry by Calculating a Safe Operating Envelope · 2024。工具面、曲率和靶窗安全包络。</span></a>
+    </div>
+    <p class="reference-disclaimer">文献提供工程问题与方法依据，不表示本网页模拟器已复现各论文算法或具备现场验证精度；部分论文可能需机构订阅。</p>
+  </div></div>
+  <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec4-body"><h2>系统辨识提供“方向感”，MPC 提供“未来路线”</h2><p><b>为什么先用系统辨识？</b> 若预测模型默认工具面响应增益恒定，遇到层理变化、BHA 受力和井壁摩阻变化就会发生模型失配。把已授权的工具面、滑动段长与后续 MWD 测点按井深对齐，可递推估计自然造斜偏置 β、工具响应增益 ĝ 与有效延迟；随后利用新观测更新下一窗口模型。物理机理 + 数据校正的工业思路可参见 <a class="ref-link" href="https://doi.org/10.2118/227896-MS" target="_blank" rel="noopener noreferrer">[3] SPE-227896-MS</a>。</p><p><b>为什么要用多步 MPC？</b> 井眼已经钻出的曲率不可撤销，狗腿度、工具极限及靶窗位置构成硬约束；单步贪心纠偏可能只改善最近一个测点，却在未来形成更大方向误差或急弯。MPC 比较未来 30 m 的控制序列，将位置误差、控制强度和控制变化率共同计入代价，再将通过约束的首段计划交由工程师审核。<a class="ref-link" href="https://doi.org/10.1016/j.jprocont.2025.103577" target="_blank" rel="noopener noreferrer">[4] 定向钻井 MPC 研究</a></p><p><b>PID 不是必然失效。</b> 在模型近似稳定、信号及时、没有多种耦合约束时，PID 或增益调度控制仍有工程价值；但仅对当前误差反馈的单环 PID 不能天然表达未来多段靶窗、DLS 和滑动约束，这才是此场景使用 MPC 的主要理由。</p><p>强化学习（RL）亦可研究轨迹控制策略，但离线训练策略必须先经过历史回放、数字孪生、边界安全评估与现场审批。<b>本互动演示采用简化辨识参数 + 单步滚动 MPC 代理，不宣称实际训练过强化学习模型。</b></p>
+    <!-- 状态空间模型：原生 HTML/CSS 排版，不依赖 MathJax / KaTeX -->
+    <div class="math-card state-space-card">
+      <div class="card-head">
+        <strong>状态空间方程 · 将地层扰动显式纳入预测</strong>
+        <span>IDENTIFIED LINEARIZED MODEL</span>
+      </div>
+
+      <div class="state-formula-box">
+        <div class="equation state-space-formula" role="math"
+             aria-label="x 下标 k 加 1 等于 A 乘 x 下标 k 加 B 乘 u 下标 k 加 w 下标 k">
+          <span class="math-token"><i>x</i><sub>k+1</sub></span>
+          <span class="eq-symbol">=</span>
+          <span class="math-token"><i>A</i><i>x</i><sub>k</sub></span>
+          <span class="eq-symbol">+</span>
+          <span class="math-token"><i>B</i><i>u</i><sub>k</sub></span>
+          <span class="eq-symbol">+</span>
+          <span class="math-token"><i>w</i><sub>k</sub></span>
+        </div>
+        <div class="state-formula-subtitle">离散线性化模型 · 以井段增量 Δs 为一个预测步长</div>
+      </div>
+
+      <p class="state-intro">
+        在本教学二维投影中，状态
+        <span class="math-inline"><i>x</i><sub>k</sub> = (<i>e</i><sub>k</sub>, ψ<sub>k</sub>)<sup>T</sup></span>，
+        其中 <i>e</i> 为横向偏差（m），ψ 为相对设计方向角（°）；
+        <span class="math-inline"><i>u</i><sub>k</sub></span> 表示滑动产生的有效转向曲率（°/m），
+        <span class="math-inline"><i>w</i><sub>k</sub></span> 表示未知的自然造斜扰动。
+        对小偏角线性化后，得到以下二维状态转移关系：
+      </p>
+
+      <div class="matrix-row" role="group" aria-label="A 为 2 行 2 列状态转移矩阵，B 为 2 行 1 列控制矩阵，w 近似等于 B 乘地层扰动 beta geo">
+        <div class="matrix-term">
+          <div class="matrix-expression">
+            <span class="matrix-name"><i>A</i><span class="eq-symbol">=</span></span>
+            <span class="math-bracket" aria-hidden="true">
+              <span class="math-grid cols-2">
+                <span class="math-cell">1</span>
+                <span class="math-cell">Δ<i>s</i>·π/180</span>
+                <span class="math-cell">0</span>
+                <span class="math-cell">1</span>
+              </span>
+            </span>
+          </div>
+          <span class="matrix-caption">状态转移矩阵 · 2 × 2</span>
+        </div>
+
+        <div class="matrix-term">
+          <div class="matrix-expression">
+            <span class="matrix-name"><i>B</i><span class="eq-symbol">=</span></span>
+            <span class="math-bracket" aria-hidden="true">
+              <span class="math-grid cols-1">
+                <span class="math-cell">Δ<i>s</i><sup>2</sup>·π/360</span>
+                <span class="math-cell">Δ<i>s</i></span>
+              </span>
+            </span>
+          </div>
+          <span class="matrix-caption">控制响应矩阵 · 2 × 1</span>
+        </div>
+
+        <div class="matrix-term matrix-term-last">
+          <div class="matrix-expression matrix-disturbance">
+            <span><i>w</i></span><span class="eq-symbol">≈</span>
+            <span><i>B</i>·β<sub>geo</sub></span>
+          </div>
+          <span class="matrix-caption">地层自然造斜扰动</span>
+        </div>
+      </div>
+
+      <p class="math-explain">
+        <span class="math-inline">Δ<i>s</i></span> 表示井段步长（m）。
+        上式使用 ψ 的角度单位（°），因此横向位移项需要乘以 π/180 进行角度到弧度的转换；
+        <i>B</i> 的首项写成 Δ<i>s</i><sup>2</sup>·π/360，与原式 ½Δ<i>s</i><sup>2</sup>·π/180 完全等价。
+      </p>
+
+      <div class="state-math-callout" role="note">
+        <b>工程适用性说明</b>
+        这里的 β<sub>geo</sub> 是按控制响应表示的地层自然方向漂移（°/m），
+        并不等同于可直接测得的地层倾角。
+        真实工具面与曲率的关系通常非线性，需结合 BHA、岩性和执行记录持续辨识；
+        此处 <i>A</i>、<i>B</i> 仅为局部二维近似，不可直接用作现场三维井眼控制模型。
+      </div>
+
+      <details class="math-source">
+        <summary>查看原始 LaTeX 记法（供论文写作引用）</summary>
+        <code>\(x_{k+1}=Ax_k+Bu_k+w_k,\quad x_k=[e_k,\psi_k]^T\)</code>
+      </details>
+    </div>
+    <div class="math-card"><div class="card-head"><strong>MPC：轨迹误差 + 工具面平顺性 + 狗腿度约束</strong><span>ROLLING-HORIZON OPTIMIZATION</span></div>
+      <div class="equation equation-long" role="math">J = <span class="sigma">∑<sub>i=1</sub><sup>N</sup></span> (x<sub>k+i</sub> − x<sub>ref,k+i</sub>)<sup>T</sup> Q (x<sub>k+i</sub> − x<sub>ref,k+i</sub>) + <span class="sigma">∑<sub>i=0</sub><sup>N−1</sup></span> u<sub>k+i</sub><sup>T</sup> R u<sub>k+i</sub> + <span class="sigma">∑</span> Δu<sub>k+i</sub><sup>T</sup> S Δu<sub>k+i</sub></div>
+      <p><b>Q</b> 惩罚偏离靶区和方向误差；<b>R</b> 惩罚过强的造斜控制；<b>S</b> 惩罚连续调整引起的激烈控制变化。另需约束 DLS ≤ 井段批准限值、工具面与滑动比例的可执行范围。对有效曲率控制进行局部线性化并使用二次约束/线性约束时，可形成二次规划（QP）；直接对工具面 cos(φ) 求解则通常是非线性问题。<b>本网页采用离散候选搜索，模拟 MPC 的滚动规划，不宣称使用了 QP 求解器。</b></p>
+      <details class="math-source"><summary>查看 LaTeX 原式</summary><code>\(J=\sum_{i=1}^{N}(x_{k+i}-x_{ref,k+i})^TQ(x_{k+i}-x_{ref,k+i})+\sum_{i=0}^{N-1}u_{k+i}^TRu_{k+i}+\sum_i\Delta u_{k+i}^TS\Delta u_{k+i}\)</code></details>
+    </div>
+<div class="weight-explainer"><div><span class="weight-letter">Q</span><b>不要脱靶</b><p>偏差 e 和方向误差 ψ 的权重，数值越大表示越重视预测轨迹贴合目标。</p></div><div><span class="weight-letter">R</span><b>不要过度造斜</b><p>惩罚有效曲率控制量 u 的幅度，相当于克制频繁依靠大幅滑动纠偏。</p></div><div><span class="weight-letter">S</span><b>不要突然打方向</b><p>惩罚相邻井段 Δu 的变化，缓和工具面/曲率命令跳变及潜在井眼急弯。</p></div></div>
+    <div class="math-constraints">约束：<span>|u<sub>k+i</sub>+β| · 30 ≤ DLS<sub>limit</sub></span>；<span>u<sub>min</sub> ≤ u<sub>k+i</sub> ≤ u<sub>max</sub></span>；还需设备、扭矩/摩阻与井段限制。这里的 DLS 约束仅适用于局部二维等效曲率，非三维工程限值计算。</div>
+    <div class="callout">AI 如何服务：同时给出<b>不操作时的自然漂移预测</b>与<b>采纳推荐后的轨迹预测</b>，并说明预计偏差、狗腿度代价和推荐理由；工程师负责核对现场振动、摩阻、测量质量，批准后才执行。</div></div></div>
+  <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec4-body"><h2>将测量、控制和地层响应对齐到同一井深</h2><table class="dtable"><thead><tr><th>数据</th><th>字段与单位</th><th>用途与质量要求</th></tr></thead><tbody><tr><td>MWD 轨迹</td><td>MD (m)、井斜 (°)、方位 (°)</td><td>最小曲率法重建轨迹，标记测量不确定性</td></tr><tr><td>定向控制</td><td>工具面 (°)、滑动段长 (m)、滑动比</td><td>控制输入；注明开始/结束井深与响应延迟</td></tr><tr><td>钻进动态</td><td>WOB、RPM、扭矩、振动、ROP</td><td>识别不稳定工况，限制候选策略</td></tr><tr><td>地层上下文</td><td>倾角 (°)、岩性、伽马、邻井</td><td>解释自然造斜与空间漂移</td></tr><tr><td>人工反馈</td><td>建议、审核、执行、效果、拒绝原因</td><td>可追溯复盘、离线校准与模型更新</td></tr></tbody></table></div></div>
+  <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec4-body"><h2>轨迹精度、狗腿约束和控制稳定性必须同时评价</h2><p><b>为什么要有 Q、R 和 S？</b> 如果仅最小化末端偏差 e²，控制器可能用猛烈造斜“抄近路”。加入方向误差和控制增量项，才能显式抑制轨迹急弯与频繁工具面调整。这里的狗腿度是局部二维曲率代理；实际 DLS 应依据相邻三维井斜/方位用最小曲率法计算。</p><p>现场受 MWD 采样间隔、钻具滞后、扭振、地层非均匀性等因素影响，系统辨识可能偏移。单纯消除位置误差可能生成过大狗腿度；应将狗腿度、扭矩/摩阻、滑动比和工具额定限制纳入安全审批。评价指标至少包含靶窗命中率、横向误差、井斜/方位预测误差、DLS（°/30 m）、滑动效率、人工采纳率与审计覆盖率。</p><div class="callout warn">安全说明：图形、工具面角及狗腿度限值均为教学假设。模拟器不提供真实钻具控制指令；任何现场操作均须遵循经批准的定向钻井设计和作业规程。</div></div></div>
+</section>
+<section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+  <div class="eyebrow">02 / MEASURE → IDENTIFY → OPTIMIZE → HUMAN → LEARN</div><h2 class="section-title">从测量到工程师授权的五步轨迹闭环</h2><p class="lead">系统先用 MWD 测点与历史控制辨识局部造斜规律，再比较未来 30 m 不纠偏与两段候选纠偏结果。<b>无论优化器算出几步，真正能进入模拟执行的只有工程师核准的第一段</b>；其余属于尚未批准的预测计划。</p>
+  <div class="pipeline" aria-label="五步控制流程">
+    <div class="pipe"><span>01 · MWD</span><div class="pipe-icon">◎</div><b>随钻轨迹测量</b><p>井斜、方位、MD 与历史控制动作对齐</p><small>机器 · 数据采集</small></div>
+    <div class="pipe"><span>02 · MODEL</span><div class="pipe-icon">◇</div><b>系统辨识与预测</b><p>估计地层自然漂移、工具面响应与延迟</p><small>AI · 响应模型</small></div>
+    <div class="pipe"><span>03 · MPC</span><div class="pipe-icon">▥</div><b>安全约束下规划</b><p>比较无干预和纠偏轨迹，约束 DLS</p><small>AI · 生成候选</small></div>
+    <div class="pipe human"><span>04 · HUMAN</span><svg viewBox="0 0 44 44" class="person-icon" role="img" aria-label="工程师人工授权"><circle cx="22" cy="11" r="6"/><path d="M11 38v-9a11 11 0 0 1 22 0v9M17 30v8m10-8v8"/></svg><b>工程师确认下发</b><p>核验井下振动、摩阻与井控状态，采纳/拒绝/微调</p><small>人 · 唯一授权门</small></div>
+    <div class="pipe"><span>05 · FEEDBACK</span><div class="pipe-icon">↺</div><b>执行与轨迹回流</b><p>记录实钻误差、DLS、授权与原因，离线校准</p><small>人 → AI · 证据回流</small></div>
+  </div>
+  <div class="handoff"><span>机器：预测偏差 + 推荐工具面/长度</span><strong>→ 人机交接线 / HUMAN APPROVAL →</strong><span>工程师：核实并授权执行</span></div>
+  <div class="sec4"><div class="sn">WHY<span>MPC</span></div><div class="sec4-body">
+    <h2>为什么不是“看到偏差就猛打工具面”？</h2>
+    <div class="comparison-table-wrap"><table class="dtable method-comparison"><thead><tr><th>策略</th><th>面对 MWD 滞后 / 自然造斜</th><th>面对 DLS、摩阻与工具约束</th></tr></thead><tbody>
+      <tr><td>几何修正 / 单步贪心</td><td>用最近测点推算下一步，容易忽略尚未显现的控制效应</td><td>当前误差可减小，却可能在下一段形成局部急弯</td></tr>
+      <tr><td>常规 PID</td><td>能闭环消除部分偏差，但遇延迟或增益变化需重新整定与防振荡设计</td><td>通常需要额外的限幅/联锁，才能处理多重硬约束</td></tr>
+      <tr><td>系统辨识 + MPC</td><td>根据近期观测更新响应模型，对未来多个井段进行预演</td><td>在同一个有限时域问题中惩罚强造斜/跳变，并拒绝不可行候选</td></tr>
+    </tbody></table></div>
+    <p class="source-note">工程文献：[1] <a href="https://doi.org/10.2118/194727-MS" target="_blank" rel="noopener noreferrer">SPE-194727-MS</a>；[2] <a href="https://doi.org/10.2118/170861-PA" target="_blank" rel="noopener noreferrer">SPE-170861-PA</a>。表格为教学分析，不表示所有 PID 或几何导向系统均无法工作。</p>
+  </div></div>
+  <div class="sec4"><div class="sn">01<span>CONTROL</span></div><div class="sec4-body"><h2>30 m 预测视窗内，权衡偏差、姿态与曲率</h2>
+    <figure class="paper-figure"><div class="figure-head"><b>两条未来：自然漂移与获批纠偏路线</b><span>ROLLING PREDICTION / CONCEPT</span></div>
+      <svg viewBox="0 0 850 276" role="img" aria-label="二维井眼轨迹从共同的当前测量点分成灰蓝自然漂移预测和绿色纠偏预测，两者朝向目标区域的差异">
+        <rect x="53" y="25" width="730" height="197" rx="5" fill="#fdfcf9"/><path d="M53 74H783M53 123H783M53 172H783" stroke="#e9e4d8" stroke-dasharray="4 5"/><rect x="395" y="188" width="105" height="34" fill="#e6f1ec" stroke="#2f7d6b" stroke-dasharray="4 4"/>
+        <path d="M288 31L444 219" stroke="#9ba3a9" stroke-width="2.5" stroke-dasharray="8 5" fill="none"/><path d="M288 31C321 62 340 83 391 120" stroke="#2f7d6b" stroke-width="3.4" fill="none"/><circle cx="391" cy="120" r="5" fill="#2f7d6b"/>
+        <path d="M391 120Q479 153 588 220" stroke="#41699b" stroke-width="3" stroke-dasharray="6 5" fill="none"/><path d="M391 120Q420 158 449 213" stroke="#2f7d6b" stroke-width="3" fill="none"/>
+        <g fill="#4d565b" font-size="12" font-family="system-ui,sans-serif"><text x="60" y="16">井深 / m（向下）</text><text x="420" y="256" text-anchor="middle">相对横向位置 / m（向右）</text><text x="398" y="105">当前测量点</text><text x="590" y="213" fill="#41699b">不干预：逐渐偏离</text><text x="451" y="183" fill="#235f51">AI 方案</text><text x="403" y="237" fill="#235f51">靶窗</text></g>
+      </svg><figcaption><b>图 3</b><span>MPC 的价值不是“画一条绿线”，而是对比继续自然漂移和采纳策略的差异。预测只提供辅助证据，不能替代工程师核实。</span></figcaption>
+    </figure>
+  </div></div>
+  <div class="sec4"><div class="sn">MATH<span>WHY IT WORKS</span></div><div class="sec4-body">
+    <h2>把“未来不要脱靶、不要猛转向”写成一个可求解的代价函数</h2>
+    <div class="math-card workflow-formula-card"><div class="card-head"><strong>有限时域 MPC · 轨迹误差与控制平顺度</strong><span>Q / R / S AND HARD CONSTRAINTS</span></div>
+      <div class="mpc-formula" role="math" aria-label="J等于未来轨迹误差的Q加权平方和，加上控制曲率的R加权平方和，加上曲率控制变化的S加权平方和">
+        <div><b>J =</b> ∑<sub>i=1</sub><sup>N</sup> ‖x<sub>k+i</sub> − x<sub>ref,k+i</sub>‖<sub>Q</sub><sup>2</sup></div>
+        <div class="equation-add">+ ∑<sub>i=0</sub><sup>N−1</sup> ‖u<sub>k+i</sub>‖<sub>R</sub><sup>2</sup></div>
+        <div class="equation-add">+ ∑<sub>i=0</sub><sup>N−1</sup> ‖u<sub>k+i</sub> − u<sub>k+i−1</sub>‖<sub>S</sub><sup>2</sup></div>
+      </div>
+      <div class="weight-explainer"><div><span class="weight-letter">Q</span><b>“脱靶”代价</b><p>预测井眼偏离设计轨迹、方向偏差越大，惩罚越高。</p></div><div><span class="weight-letter">R</span><b>“强控制”代价</b><p>避免过度利用滑动造斜强行追靶，兼顾工具负担。</p></div><div><span class="weight-letter">S</span><b>“乱打方向”代价</b><p>限制相邻井段的控制跳变，减少不必要的曲率变化。</p></div></div>
+      <p class="math-plain"><b>工程翻译：</b>给定 MWD 最新估计的井眼位置与方向，电脑先在 30 m 的预测窗内模拟多种可执行方案；违反 DLS、工具能力或摩阻/扭矩限制的方案先剔除，再从剩余候选中选择综合代价较小的一条，交工程师审核。</p>
+    </div>
+  </div></div>
+  <div class="sec4"><div class="sn">02<span>ALGORITHM</span></div><div class="sec4-body"><h2>可读的 MPC 核心循环：预测多步，但只执行获批的第一段</h2>
+    <p>先辨识出局部 A、B、地层漂移 β；求解器在未来 N 步内平衡误差和控制变化，再把<b>第一段候选</b>提交工程师。新的 MWD 数据回来后重新辨识并求解，这叫滚动时域（Receding Horizon）。</p>
+    <div class="code-card"><div class="code-top"><span>Python / CVXPY MPC CORE</span><span>可执行结构示例 · 不在网页运行</span></div><pre><code># 线性化二维局部模型；输入均来自可用测点的状态估计
+# 本段演示 QP 结构：需要 Python 环境中的 numpy + cvxpy，网页不执行
+import cvxpy as cp
+import numpy as np
+
+def propose_first_segment(x0, A, B, beta, x_ref, u_prev,
+                          Q, R, S, u_max, dls_max, N=6):
+    # 一步 = 5 m，N=6 对应未来 30 m；u、beta 单位 °/m
+    U = cp.Variable(N)
+    X = cp.Variable((2, N + 1))
+    constraints = [X[:, 0] == x0]
+    objective = 0
+    for k in range(N):
+        constraints += [
+            X[:, k + 1] == A @ X[:, k] + B[:, 0] * (U[k] + beta),
+            cp.abs(U[k]) &lt;= u_max,                 # 工具可执行曲率
+            30 * cp.abs(U[k] + beta) &lt;= dls_max    # 教学二维 DLS 约束
+        ]
+        err = X[:, k + 1] - x_ref[k]
+        du = U[k] - (u_prev if k == 0 else U[k - 1])
+        objective += cp.quad_form(err, Q) + R * cp.square(U[k])
+        objective += S * cp.square(du)
+    problem = cp.Problem(cp.Minimize(objective), constraints)
+    problem.solve(solver=cp.OSQP)
+    if U.value is None:  # 不可行时必须回退到人工复核
+        return None
+    return float(U.value[0]), U.value.tolist()  # 首段建议 / 完整预测序列
+
+# 控制权限不属于求解器：首段建议需工程师批准才可执行
+# 下个有效 MWD 测点到来，再更新 beta、A、B 并重新求解
+</code></pre></div>
+    <div class="rolling-callout"><div class="rolling-badge">01 / N</div><div><b>滚动优化的核心：算出未来六段，只授权第一段。</b><p>上述程序求出未来 30 m 的 <code>U[0]…U[5]</code>，但只返回第一段 <code>U[0]</code> 作为待审批建议；新 MWD 测点到来后，用真实测量修正 β、A、B，再重新计算后续控制。如果当前约束没有可行解，程序返回 <code>None</code> 并转人工复核，而不是强行输出一条“最优指令”。</p></div></div>
+    <div class="callout">代码假定优化变量是线性化后的有效曲率，R、S 为标量非负权重，Q 为半正定矩阵，因此是典型凸 QP 的教学框架。将“工具面角度 φ、滑动段长 L”映射回现场动作时，需要单独处理非线性、控制延迟与可执行性约束。</div>
+  </div></div>
+  <div class="sec4"><div class="sn">03<span>HUMAN</span></div><div class="sec4-body"><h2>保留人工决策与反馈证据</h2><p>工程师可拒绝模型建议，也可选择其他工具面和滑动段长。系统应记录候选值、人工下发值、测量时刻、井深、预测偏差、实钻偏差及原因；只有通过质量核查的数据才能进入下一版参数辨识与策略评估。</p><div class="callout">AI 如何服务：系统把过去“看完 MWD 才凭经验计算”的一部分工作，变成可审查的未来 30 m 轨迹对照。它不代替工程师权衡井下摩阻、震动或现场安全要求。</div></div></div>
+</section>
+<section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+  <div class="eyebrow">03 / LIVE LAB · TRAJECTORY NAVIGATION / HUMAN-IN-THE-LOOP</div>
+  <h2 class="section-title">井眼轨迹导航与工程师授权台</h2>
+  <p class="lead">每个采样周期生成一段模拟井眼，蓝色虚线表示“不干预”的未来 30 m，绿色虚线表示“采纳 AI 推荐”后的预测。移动滑块只是<b>草拟人工参数</b>，点击按钮才会下达模拟命令。</p>
+  <div class="statebar" id="statebar" role="status" aria-live="polite"><i class="status-dot"></i><strong id="state-text">监测中 · 工程师掌握最终控制权</strong><span id="state-level">HUMAN CONTROL</span></div>
+  <div class="lab-grid">
+    <div class="lab-left">
+      <article class="card trajectory-card"><div class="card-head"><strong>二维井眼剖面 · 实钻 / 设计 / 预测</strong><span>MD 3000—3300 m · 偏离量投影</span></div>
+        <svg id="trajectory-chart" viewBox="0 0 850 550" role="img" aria-label="井深与相对横向位置坐标下，设计轨迹、实钻轨迹、不干预预测和AI推荐预测，含地层、靶区及图例"></svg>
+        <div class="legend"><span><i class="legend-line design"></i>设计轨迹</span><span><i class="legend-line actual"></i>实钻轨迹</span><span><i class="legend-line natural"></i>不干预预测</span><span><i class="legend-line ai"></i>AI 建议预测</span><span><i class="legend-box"></i>靶窗</span></div>
+        <p class="figcap"><b>图 4</b><span>相对横向位置为二维投影（m），纵轴为测量井深 MD（m）。蓝色虚线是自然漂移预测，青玉虚线是尚未授权的 AI 方案预测；不等于真实钻机已执行。</span></p>
+      </article>
+      <article class="card trend-card"><div class="card-head"><strong>狗腿度 / 摩阻代理趋势预测</strong><span>DLS × 30 m 归一化对照</span></div>
+        <svg id="trend-chart" viewBox="0 0 850 268" role="img" aria-label="横轴未来进尺米，左轴狗腿度度每30米，右轴摩阻代理指数，包含两条预测曲线和警戒线"></svg>
+        <div class="legend"><span><i class="legend-line actual"></i>预测狗腿度（°/30m）</span><span><i class="legend-line clay"></i>摩阻代理（指数）</span><span><i class="legend-line danger"></i>教学狗腿参考线</span></div>
+        <p class="figcap"><b>图 5</b><span>趋势为简化曲率与井壁接触代理，不是工程实测摩阻系数；狗腿参考线用于教学，无法替代现场设计限值。</span></p>
+      </article>
+      <article class="card explain-card"><div class="card-head"><strong>地层响应预测 · AI 为什么推荐当前工具面</strong><span>SYSTEM IDENTIFICATION</span></div>
+        <div class="explain-grid"><div><small>辨识自然漂移</small><b id="drift-kpi">+0.018 °/m</b><span>未滑动时的姿态扰动</span></div><div><small>工具面响应增益</small><b id="gain-kpi">0.160 °/m</b><span>单位滑动弯曲响应</span></div><div><small>未来 30 m 自然偏差</small><b id="natural-kpi">—</b><span>无新增控制时估算</span></div><div><small>AI 方案未来偏差</small><b id="ai-kpi">—</b><span>候选，未自动执行</span></div></div>
+        <p class="explain-note" id="explain-note">模型正在计算未来 30 m 的方向漂移与狗腿代价，供工程师比较。</p>
+      </article>
+      <article class="card solver-trace-card"><div class="card-head"><strong>算法运行回放 · MPC 滚动代价</strong><span>OPTIMIZATION TRACE / 24 STEPS</span></div>
+        <svg id="solver-trace" viewBox="0 0 850 232" role="img" aria-label="横轴最近二十四个预测求解时刻，纵轴 MPC 代价函数 J，绘制随测量更新的滚动代价曲线"></svg>
+        <div class="legend"><span><i class="legend-line actual"></i>最优预测代价 J*</span><span><i class="legend-line design"></i>每次新测点重新规划</span></div>
+        <p class="figcap"><b>图 6</b><span>每次新测点会触发一次预测与离散候选搜索。J* 不是事故概率或实际能耗，不同测量点的状态变化会引起代价波动。</span></p>
+      </article>
+      <article class="card model-state-card"><div class="card-head"><strong>线性化状态方程 · 滚动辨识</strong><span>STATE-SPACE / LIVE</span></div>
+        <div class="state-equation">x<sub>k+1</sub> = A x<sub>k</sub> + B u<sub>k</sub> + w<sub>k</sub></div>
+        <div class="state-kpis"><div><small>当前观测偏差 e</small><b id="state-e">—</b></div><div><small>相对方向角 ψ</small><b id="state-psi">—</b></div><div><small>辨识地层扰动 β</small><b id="beta-live">—</b></div><div><small>工具响应增益 ĝ</small><b id="gain-live">—</b></div></div>
+        <p class="small muted" id="model-state-note">观测与控制回流后更新 β 与 ĝ；单次辨识不能证明真实地质倾角。</p>
+      </article>
+      <article class="card readiness-card"><div class="card-head"><strong>工程落地前校验清单</strong><span>SAFETY / MODEL ASSURANCE</span></div>
+        <div class="readiness-list">
+          <div><span class="readiness-icon">01</span><p><b>测点延迟核查</b><small>区分仪器距钻头的空间偏移与测量上传延迟；将控制指令与反馈井深正确对齐。</small></p></div>
+          <div><span class="readiness-icon">02</span><p><b>三维曲率复核</b><small>用井斜、方位与最小曲率法核算真实 DLS；二维横向误差不替代三维安全审核。</small></p></div>
+          <div><span class="readiness-icon">03</span><p><b>扭矩摩阻与人工签发</b><small>检查 BHA 工况、摩阻趋势和可执行范围；所有建议需工程师批准才执行。</small></p></div>
+        </div>
+      </article>
+    </div>
+    <div class="lab-right">
+      <article class="card control-card"><div class="card-head"><strong>当前随钻状态</strong><span>MWD / SYNTHETIC</span></div>
+        <div class="readouts"><div><small>测量井深</small><b id="md-now">—</b><em>m</em></div><div><small>当前井斜</small><b id="inc-now">—</b><em>°</em></div><div><small>当前方位</small><b id="azi-now">—</b><em>°</em></div><div><small>工具面角</small><b id="tf-now">—</b><em>°</em></div></div>
+        <div class="deviation"><span>相对设计轨迹的横向误差</span><strong id="error-now">—</strong><small id="dls-now">狗腿度：—</small></div>
+      </article>
+      <article class="card ai-card" id="ai-panel"><div class="card-head"><strong>AI 轨迹导航助手</strong><span>ROLLING MPC · 30 m</span></div>
+        <div class="ai-hero"><div><span>候选工具面角</span><strong id="ai-toolface">—</strong><small>预测控制 / 每次测量重新规划</small></div><div><span>候选滑动段长</span><strong id="ai-length">—</strong><small>受教学狗腿度约束</small></div></div>
+        <div class="comparison"><div><small>若不干预，30 m 后偏差</small><b id="baseline-error">—</b></div><div><small>若采用 AI 建议，30 m 后偏差</small><b id="planned-error">—</b></div></div>
+        <p class="ai-reason" id="ai-reason">基于已辨识自然造斜与工具面响应，估计未来 30 m 的横向漂移，再权衡纠偏和狗腿代价。</p>
+        <div class="ai-indicator" id="ai-warning">候选仅供审核，不会自动下发。</div>
+      </article>
+      <article class="card brain-card"><div class="card-head"><strong>算法大脑 · MPC 求解诊断</strong><span>OPTIMIZATION / ONLINE</span></div>
+        <div class="brain-kpis"><div><small>最优滚动代价 J*</small><b id="mpc-cost">—</b></div><div><small>当前辨识地层偏置</small><b id="mpc-beta">—</b></div><div><small>预测地层倾角（合成先验）</small><b id="mpc-dip">—</b></div><div><small>第一段预测狗腿度</small><b id="mpc-dls">—</b></div><div><small>前瞻规划第二段</small><b id="mpc-next">—</b></div></div>
+        <div class="brain-rail"><span>估计状态</span><i></i><span>预测候选</span><i></i><span>约束筛选</span><i></i><b>人工授权</b></div>
+        <p class="small muted" id="mpc-reason">滚动模型正在比较未来 30 m 的候选控制序列。</p>
+      </article>
+      <div class="handoff-line"><span>机器：预测 / 规划</span><strong>→ 人工审核 →</strong><span>工程师：最终授权</span></div>
+      <article class="card action-card"><div class="card-head"><strong>工程师决策门 · Human-in-the-loop</strong><span>APPROVAL REQUIRED</span></div>
+        <div class="human-approval-banner"><span class="approval-circle">人</span><div><strong>建议不等于控制指令</strong><small>工具面与滑动段长必须经工程师确认；执行状态以本卡片下方记录为准。</small></div></div>
+        <label for="manual-tf">人工工具面角 <output id="tf-out">180°</output></label><input type="range" id="manual-tf" min="0" max="360" value="180" step="5"><div class="range-ends"><span>0° · 正向</span><span>180° · 反向</span><span>360°</span></div>
+        <label for="manual-length">人工滑动段长 <output id="length-out">18 m</output></label><input type="range" id="manual-length" min="6" max="36" value="18" step="3"><div class="range-ends"><span>6 m</span><span>36 m</span></div>
+        <div class="action-buttons"><button id="approve-ai" type="button" class="btn primary">✓ 采纳 AI 建议</button><button id="run-manual" type="button" class="btn secondary">人工滑动钻进</button></div>
+        <div class="action-buttons"><button id="pause" type="button" class="btn ghost">暂停模拟</button><button id="restart" type="button" class="btn ghost">重置教学井段</button></div>
+        <div class="order-status" id="order-status">当前执行：自然钻进。等待工程师授权。</div>
+        <p class="form-note">滑块仅编辑候选控制量，点击按钮才进入教学模拟执行队列。模型无现场控制权限。</p>
+      </article>
+      <article class="card log-card"><div class="card-head"><strong>人工决策与反馈审计</strong><span><b id="log-count">0</b> 条记录</span></div><ol id="audit-log" aria-live="polite"><li class="log-placeholder">暂无授权记录。先尝试人工滑动，再比较 AI 纠偏建议。</li></ol><p class="small muted">记录采用模拟时间戳、MD、工具面、段长与动作类型；用于离线复盘，不直接在线重训。</p>
+        <div class="audit-evidence"><div class="eyebrow">HUMAN-IN-THE-LOOP / DECISION EVIDENCE</div>
+          <div class="audit-metrics"><div><small>人工采纳 AI 次数</small><b id="approval-num">0</b></div><div><small>人工自主下发次数</small><b id="manual-num">0</b></div><div><small>参与辨识的观测点</small><b id="observation-num">0</b></div><div><small>当前反馈状态</small><b id="audit-mode">待人工授权</b></div></div>
+          <div class="audit-checks"><div><span class="audit-check-icon">✓</span><span><b>建议与执行隔离</b><small>移动候选滑块不触发任何控制动作</small></span></div><div><span class="audit-check-icon">✓</span><span><b>第二阶段仅作预测</b><small>MPC 前瞻序列不会在下一井段自动继续</small></span></div><div><span class="audit-check-icon">✓</span><span><b>新测点回流辨识</b><small>观察数据逐步修正 β / ĝ，结果需线下验证</small></span></div></div>
+        </div></article>
+    </div>
+  </div>
+  <p class="safety-note">⚠ 全部轨迹、地层响应、狗腿阈值与摩阻趋势是教学数据。二维投影不能完整表达三维井眼曲率；真实方案必须包含 MWD 误差、三维最小曲率计算、地质导向和工程审批。本页不会控制任何钻井设备。</p>
+</section>
+</main>
+<footer>Petro × AI Atlas · Drilling / d3 <span>人机协同 · AI 是导航仪，工程师是驾驶员</span></footer>
+</div>
+<script src="demo.js"></script>
+</body></html>

@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="钻井智能地质导向：实时贝叶斯反演、LWD仪器零长、前方储层预测与地质导向师人工授权。">
+<title>智能地质导向与储层追踪 · Petro × AI Atlas</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div class="shell">
+<header class="doc-head">
+  <div class="crumb"><span>总览</span><b>/</b><span>作业链</span><b>/</b><span>钻井</span><b>/</b><strong>智能地质导向与储层追踪</strong></div>
+  <div class="dh-kicker"><span class="tag">环节 03 · 钻井</span><span class="tag method">实时反演 + 深度学习</span><span class="tag case"><i class="tag-dot"></i>案例 d7-geosteering · v1.1.0</span></div>
+  <h1 class="dh-title">智能地质导向与储层追踪</h1>
+  <p class="dh-sub">薄储层中，钻头沿前方钻进，GR 与电阻率测量却发生在后方的不同位置；地层起伏、各向异性和探测尺度又增加了解释歧义。本案例以<b>地震/邻井先验 + LWD 贝叶斯反演 + 可选 LSTM 趋势预测</b>实现有不确定度的地质导航，由<b>地质导向师最终授权</b>，而不是 AI 自动转向。</p>
+  <div class="dh-tags"><span class="dtag" data-d="高">● 难度 高</span><span class="tag">D7</span><span class="tag pale">Bayesian Inversion · LWD · Human-in-the-loop</span></div>
+</header>
+<nav class="tabs" role="tablist" aria-label="案例三大板块">
+  <button class="tab active" role="tab" id="tab-bg" data-tab="bg" aria-selected="true" aria-controls="panel-bg"><span>01</span> 专业背景</button>
+  <button class="tab" role="tab" id="tab-flow" data-tab="flow" aria-selected="false" aria-controls="panel-flow"><span>02</span> 案例流程</button>
+  <button class="tab" role="tab" id="tab-demo" data-tab="demo" aria-selected="false" aria-controls="panel-demo"><span>03</span> 交互演示</button>
+</nav>
+<main>
+<section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+  <div class="eyebrow">01 / WHY AI WORKS · PROFESSIONAL BACKGROUND</div>
+  <h2 class="panel-title">为什么“后脑勺看见地层”，钻头却可能早已出靶？</h2>
+  <p class="lead">把钻头想象成车辆，把随钻测井 LWD 想象成装在车身后方的摄像头：摄像头读到的岩性对应已经经过的位置，不一定是车头所处的位置。更麻烦的是地下层界起伏、薄互层与电阻率各向异性，使单条曲线不能唯一反推未来地质。<b>要先校准“摄像头在哪里”，再给预测标出可信程度。</b></p>
+  <div class="judge"><div><small>数据形态</small><b>LWD + 地震体</b><span>GR、电阻率、井斜、邻井层位</span></div><div><small>标注成本</small><b>高</b><span>界面深度需要人工地质解释</span></div><div><small>可见收益</small><b>增加储层钻遇率</b><span>降低穿顶、穿底与二次纠偏</span></div><div><small>技术难度</small><b>高</b><span>盲区、多解性、预测不确定度</span></div></div>
+  <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec-body">
+    <h3>“穿靴戴帽”：地层在变，测量还在钻头后方</h3>
+    <p>水平井并非沿一条永远水平的砂层钻进。构造起伏、薄互层、砂体尖灭与小断层，会让优质储层顶底界面不断抬升或下倾。伽马、深/浅电阻率等 LWD 工具安装在钻头后方的 BHA 上，<b>每种仪器的零长不同</b>；钻头到达新的地层位置时，当前曲线可能仍对应已钻过的井段。只在 GR 变高后才纠偏，可能已从砂岩钻进泥岩。<a class="ref" href="https://doi.org/10.2118/132439-PA" target="_blank" rel="noopener noreferrer">[1] SPE-132439-PA · 方位电阻率与地质导向</a> 讨论了深探测方位电阻率在层界接近时的提前响应；但它是否能提前识别层界取决于仪器探测深度、地层电性和方向敏感性，不能把所有 LWD 都当成“提前看见前方”。</p>
+    <figure class="paper-figure"><div class="figure-head"><b>薄层追踪中的钻头—传感器空间错位</b><span>GEOLOGY / WELLBORE / SENSOR OFFSET</span></div>
+      <svg viewBox="0 0 850 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="起伏砂岩储层夹在上下泥岩之间，设计井眼贯穿储层，实钻钻头可能穿出底界，LWD传感器位于钻头后方，前方预测区间尚未被测量">
+        <defs><marker id="aBg" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto"><path d="M1 1L8 4L1 7" fill="none" stroke="#41699b" stroke-width="1.5"/></marker></defs>
+        <rect x="24" y="18" width="802" height="280" rx="6" fill="#fdfcf9" stroke="#e9e4d8"/>
+        <path d="M40 102 Q145 72 235 105 T410 110 Q505 144 605 190 T810 184V280H40Z" fill="#f4efe5" stroke="#d8cbb9" stroke-width="1.7"/>
+        <path d="M40 167 Q145 137 235 170 T410 175 Q505 209 605 255 T810 249V280H40Z" fill="#e7eef1"/>
+        <path d="M40 102 Q145 72 235 105 T410 110 Q505 144 605 190 T810 184 L810 249 Q706 276 605 255 T410 175 Q320 150 235 170 T40 167 Z" fill="#f6e5bf" opacity=".95"/>
+        <path d="M40 102 Q145 72 235 105 T410 110 Q505 144 605 190 T810 184" stroke="#b9945b" stroke-width="2.1" fill="none"/>
+        <path d="M40 167 Q145 137 235 170 T410 175 Q505 209 605 255 T810 249" stroke="#b9945b" stroke-width="2.1" fill="none"/>
+        <path d="M55 133 Q145 112 235 138 T410 140 Q505 177 605 223 T810 216" stroke="#949a98" stroke-width="2.4" stroke-dasharray="8 5" fill="none"/>
+        <path d="M55 131 C190 145 330 142 452 153 S588 185 685 266" stroke="#2f7d6b" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <path d="M685 266 Q740 260 794 225" stroke="#41699b" stroke-width="2.4" stroke-dasharray="7 5" fill="none"/>
+        <circle cx="539" cy="177" r="7" fill="#b26a39" stroke="#fff" stroke-width="2"/><circle cx="685" cy="266" r="8" fill="#b05a51" stroke="#fff" stroke-width="2"/>
+        <path d="M539 177L534 55" stroke="#b26a39" stroke-dasharray="3 4"/><path d="M685 266L706 63" stroke="#b05a51" stroke-dasharray="3 4"/>
+        <path d="M548 73H681" stroke="#41699b" stroke-width="1.4" marker-end="url(#aBg)"/><text x="616" y="63" font-size="11" fill="#41699b" text-anchor="middle">仪器零长：示意 20 m</text>
+        <text x="502" y="44" font-size="11" fill="#8e5229">LWD 测点</text><text x="693" y="45" font-size="11" fill="#b05a51">钻头位置</text>
+        <text x="70" y="85" font-size="12" fill="#79828a">上覆泥岩</text><text x="72" y="150" font-size="12" fill="#8e6931">含油砂岩 · 甜点区</text><text x="70" y="250" font-size="12" fill="#79828a">下伏泥岩</text>
+        <text x="671" y="287" fill="#b05a51" font-size="11">示意出靶点</text><text x="734" y="205" fill="#41699b" font-size="10.5">AI 纠偏预测</text>
+        <path d="M68 311H105" stroke="#949a98" stroke-width="2" stroke-dasharray="6 4"/><text x="112" y="315" fill="#79828a" font-size="11">预钻设计</text>
+        <path d="M281 311H318" stroke="#2f7d6b" stroke-width="3.3"/><text x="325" y="315" fill="#79828a" font-size="11">实钻轨迹</text>
+        <path d="M472 311H509" stroke="#41699b" stroke-width="2.6" stroke-dasharray="6 4"/><text x="516" y="315" fill="#79828a" font-size="11">建议预测</text>
+      </svg><figcaption>图 1｜起伏储层、钻头—LWD 工具零长与出靶示意。不同 GR、电阻率仪器的零长和探测深度并不相同；20 m 为图示距离，18 m 为演示中的合成参数。预测的前方 30 m 不是已测地质真值。</figcaption></figure>
+     <div class="compare-card"><div class="card-head"><strong>传统方法 vs 概率地质导航 · 为什么要升级？</strong><span>FIELD DECISION COMPARISON</span></div>
+       <div class="table-wrap"><table class="dtable"><thead><tr><th>现场思路</th><th>能够做到</th><th>遇到薄层与盲区时的不足</th></tr></thead><tbody>
+       <tr><td>单看 GR、井斜或对比邻井</td><td>快速识别已钻位置的岩性趋势</td><td>测点在钻头后方；GR 受泥质夹层影响，无法唯一定位前方层界</td></tr>
+       <tr><td>仅依靠钻前地震解释</td><td>提供大尺度构造与断层位置</td><td>薄层及小断层可能低于分辨率，地质模型误差积累</td></tr>
+       <tr><td>贝叶斯反演 + 预测 + 人工审核</td><td>实时融合先验和 LWD、表达多种可能层界并辅助调斜</td><td>必须做测点配准、正演校核、外推不确定性判断，不能保证不出靶</td></tr>
+       </tbody></table></div></div>
+  </div></div>
+  <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec-body">
+    <h3>为何“先验 + 新测量”比一条曲线可靠？</h3>
+    <p><b>实时反演</b>的逻辑是“先画草图，再用现场证据不断修图”。先把地震层位、邻井分层作为地层先验；再用电阻率电磁正演（必要时结合 GR 的岩性解释）比较候选地质结构与当前 LWD 的吻合程度，给更可信的候选更大权重。只有按仪器测点井深配准后的数据才能参与这一步。<a class="ref" href="https://doi.org/10.1190/geo2016-0569.1" target="_blank" rel="noopener noreferrer">[2] Geophysics (2017) · 贝叶斯网络地质导向</a> 给出了概率反演框架；<a class="ref" href="https://doi.org/10.30632/PJV66N2-2025a2" target="_blank" rel="noopener noreferrer">[3] Petrophysics (2025) · 实时随机反演</a> 研究了后验模型及其不确定度。<b>序列预测</b>：对连续反演的层界深度、倾角与厚度形成历史窗口，可由 LSTM 或状态空间模型估计下一井段的变化趋势。LSTM 通过门控记忆近一段井深的模式，适合学习非线性连续序列，但若前方有突变断层，预测仍可能失败。<a class="ref" href="https://doi.org/10.11698/PED.2021.04.17" target="_blank" rel="noopener noreferrer">[4]《石油勘探与开发》(2021) · LSTM 随钻地层倾角解释</a> 的 LSTM 用于层界变化识别与倾角解释，<b>并不证明未来 30 m 的外推精度</b>。随后比较“维持井斜”和“调整井斜”两条轨迹，供人工选用。</p>
+    <div class="math-card"><div class="math-top">BAYESIAN FORMATION MODEL UPDATE · 贝叶斯更新</div>
+      <div class="math-formula" role="math" aria-label="P M 条件于 D 正比于 P D 条件于 M 乘 P M"><i>P</i>(<i>M</i><span class="mid">|</span><i>D</i>) <span class="eq">∝</span> <i>P</i>(<i>D</i><span class="mid">|</span><i>M</i>) <span class="mul">·</span> <i>P</i>(<i>M</i>)</div>
+      <div class="math-grid"><div><span>先验 · <i>P</i>(<i>M</i>)</span><b>地震 + 邻井</b><small>钻前对界面与岩性的认识</small></div><div><span>似然 · <i>P</i>(<i>D</i>|<i>M</i>)</span><b>测井响应吻合度</b><small>假定地层模型能否解释 LWD</small></div><div><span>后验 · <i>P</i>(<i>M</i>|<i>D</i>)</span><b>更新后的地层概率</b><small>模型有多个可能解，需显示区间</small></div></div>
+      <p class="math-note">其中 <i>M</i> 是候选层界/电性结构，<i>D</i> 是已经按测点井深对齐的测量；“∝”省略归一化证据项。先验像“钻前猜的草图”，似然像“把预测曲线与实测曲线对账”，后验是“纠正后、仍带误差区间的地图”。<b>反演不是直接透视钻头前方。</b></p>
+    </div>
+    <div class="callout"><b>AI 如何服务？</b>地震提供起点，后方 LWD 校验并修正地图；LSTM 等预测器利用历史连续性提出下一段变化假设，地质师检查误差区间和邻井是否支持这一假设。地质导向师把这些预测与邻井、摩阻、振动和施工窗口一起核对，确认后才向定向钻井队提供建议。</div>
+  </div></div>
+  <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec-body"><h3>既要看测井，也要知道“测点到底在哪里”</h3>
+    <div class="table-wrap"><table class="dtable"><thead><tr><th>数据</th><th>关键字段</th><th>作用与注意点</th></tr></thead><tbody>
+    <tr><td>随钻 GR / 电阻率</td><td>自然伽马 API；深/浅或方位电阻率</td><td>识别岩性响应、边界距离；不同工具探测深度不同</td></tr>
+    <tr><td>轨迹与 BHA</td><td>MD、TVD、井斜/方位、传感器零长</td><td>区分钻头坐标与每条测井曲线的测点坐标</td></tr>
+    <tr><td>地震先验</td><td>三维地震层位、构造解释及不确定度</td><td>提供测点前方的结构趋势，但分辨率有限</td></tr>
+    <tr><td>邻井 / 录井</td><td>分层深度、岩性组合、砂体厚度、返砂</td><td>校核储层模式、给出先验约束</td></tr>
+    <tr><td>人工反馈</td><td>建议采纳、维护井斜、出靶、误差复核</td><td>形成可审计样本，支持离线模型再训练</td></tr>
+    </tbody></table></div>
+  </div></div>
+  <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec-body"><h3>多解性与外推风险必须展示出来，而非藏在“最优轨迹”后</h3>
+    <p>仪器响应具有非局部敏感性，井下电阻率各向异性、泥浆侵入与层厚变化可能造成相似的曲线；薄互层和小断层又超出常规地震的分辨率。即使后验均值接近真值，预测区间也可能很宽。因而真实系统须做测深配准、正演校核、井间外推验证和不确定性阈值管理。</p><div class="callout warn"><b>工程边界</b>本页面运行的是合成储层函数、示意的贝叶斯偏置更新和轻量多步搜索，<b>并未训练 LSTM，也未实现真实电阻率正演反演</b>。井斜、探测距离、目标层位及风险阈值仅用于课堂，不能用于现场导向指令。</div>
+   </div></div>
+   <div class="references card"><div class="section-label">VERIFIED REFERENCES / 真实工业与算法文献</div><h3>参考文献 · 可点击查阅题名、摘要与 DOI</h3>
+     <ol>
+       <li><a class="ref" href="https://doi.org/10.2118/132439-PA" target="_blank" rel="noopener noreferrer">Chemali et al., 2010, SPE-132439-PA</a>，实时方位电阻率解释与地质导向。</li>
+       <li><a class="ref" href="https://doi.org/10.1190/geo2016-0569.1" target="_blank" rel="noopener noreferrer">Geophysics, 2017, Geosteering by exact inference on a Bayesian network</a>，概率地质导向反演。</li>
+       <li><a class="ref" href="https://doi.org/10.30632/PJV66N2-2025a2" target="_blank" rel="noopener noreferrer">Sviridov et al., 2025, SPWLA-2025-v66n2a2</a>，LWD 超深方位电阻率实时随机反演。</li>
+       <li><a class="ref" href="https://doi.org/10.11698/PED.2021.04.17" target="_blank" rel="noopener noreferrer">孙歧峰等，2021，基于 LSTM 的随钻地层倾角解释方法</a>，层界识别与倾角解释。</li>
+       <li><a class="ref" href="https://doi.org/10.2118/227318-MS" target="_blank" rel="noopener noreferrer">SPE-227318-MS, 2025</a>，基于方位电阻率多层反演的自动层界拾取与地质导向。</li>
+     </ol><p class="small-note">以上是对应技术的研究出处，并不代表本页面的合成模拟器复现了论文算法或报告的现场性能。</p>
+   </div>
+ </section>
+
+ <section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+  <div class="eyebrow">02 / WORKFLOW · MACHINE ADVISES, HUMAN AUTHORIZES</div>
+  <h2 class="panel-title">看（测量）→ 想（反演）→ 猜（预测）→ 人工拍板</h2>
+  <p class="lead">Why Bayesian？钻前地震只是大概轮廓，单条测井曲线又存在多解；概率更新能保留“可能有几个不同层界”的证据。Why LSTM？层位与倾角沿井深连续变化，门控序列模型可以学习此前若干井段的趋势。<b>先验不等于真值，LSTM 不是唯一选择；卡尔曼滤波、地质统计模型或物理状态空间预测同样可以按工况选择。</b></p>
+  <div class="pipeline">
+    <article class="pipe"><div class="p-top"><span>01 / SENSOR</span><i>▥</i></div><h3>随钻数据采集</h3><p>输入：GR、电阻率、井斜、仪器零长。</p><p>处理：把传感器的井深与钻头位置分开对齐。</p><div class="p-foot">输出：测点位置明确的序列 → AI</div></article>
+    <article class="pipe"><div class="p-top"><span>02 / INVERSION</span><i>◇</i></div><h3>实时地层反演</h3><p>输入：地震/邻井先验与最新 LWD。</p><p>处理：根据测井吻合度更新层位与不确定度。</p><div class="p-foot">输出：最新地层模型 → 预测器</div></article>
+    <article class="pipe"><div class="p-top"><span>03 / PREDICTION</span><i>↗</i></div><h3>前方 30 m 预测</h3><p>输入：最近窗口的界面深度与倾角。</p><p>处理：预测上/下界面，比较保持井斜与调整井斜。</p><div class="p-foot">输出：方案、置信区间、偏差 → 人</div></article>
+    <article class="pipe human"><div class="p-top"><span>04 / HUMAN</span><svg class="person" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="8" r="4"/><path d="M7 28v-7a9 9 0 0 1 18 0v7M12 20v8M20 20v8"/></svg></div><h3>地质导向师审核</h3><p>结合邻井认识、摩阻、井控与预测置信度，选择采纳或维持当前井斜。</p><div class="p-foot">Human-in-the-loop · 人工最终授权</div></article>
+    <article class="pipe"><div class="p-top"><span>05 / FEEDBACK</span><i>↺</i></div><h3>执行与反馈回流</h3><p>执行授权方案；比对后续实钻轨迹、LWD 与边界解释误差。</p><div class="p-foot">输出：人工判断 + 实测结果 → 模型校准</div></article>
+  </div>
+  <div class="handoff"><span>机器：预测与候选建议</span><strong>→ 人机交接线 →</strong><span>人类：授权或否决</span><small>反馈 ↺ 模型</small></div>
+   <article class="math-card flow-math"><div class="math-top">MATH / 概率更新 + 带约束井斜选择</div>
+     <div class="math-equation-grid">
+       <div class="eq-panel"><span class="eq-label">01 · 地层后验（Bayes）</span><div class="math-formula" role="math" aria-label="P M 条件于 D 等于 P D 条件于 M 乘 P M 除以 P D"><i>P</i>(<i>M</i>|<i>D</i>) = <span class="frac"><span><i>P</i>(<i>D</i>|<i>M</i>)·<i>P</i>(<i>M</i>)</span><span><i>P</i>(<i>D</i>)</span></span></div><p>先验 × 观测吻合度，再按证据项归一化；得到带不确定度的地层地图。</p></div>
+       <div class="eq-panel"><span class="eq-label">02 · 测井似然（示例高斯噪声）</span><div class="math-formula" role="math" aria-label="负对数似然与测井残差平方加权和成正比">−log <i>P</i>(<i>D</i>|<i>M</i>) ∝ <span class="frac"><span>1</span><span>2</span></span>‖<i>D</i>−<i>F</i>(<i>M</i>)‖<sub>Σ<sup>−1</sup></sub><sup>2</sup></div><p>F(M) 是测井正演曲线，Σ 是噪声协方差。测得不准的通道，应给予更低权重。</p></div>
+       <div class="eq-panel"><span class="eq-label">03 · 推荐井斜的风险代价</span><div class="math-formula" role="math" aria-label="J 等于出靶风险，加 lambda 乘以狗腿约束惩罚"><i>J</i>(<i>u</i>) = <i>R</i><sub>out</sub>(<i>u</i>) + λ<i>R</i><sub>DLS</sub>(<i>u</i>)</div><p>对后验的多个可能地层进行轨迹模拟，优先避开出靶且满足狗腿度限制的候选方案。</p></div>
+     </div>
+     <p class="math-note">以上为真实算法架构的简化教学表达；现场须采用匹配仪器物理的正演模型、估计噪声协方差，并将狗腿度、摩阻及井控作为独立可行性约束，不能仅靠罚分保证安全。</p>
+   </article>
+  <div class="flow-grid">
+    <article class="card"><div class="section-label">ALGORITHM / 教学伪代码</div><h3>滑动窗口预测与地质导向建议</h3>
+       <pre class="code-card"><code><span class="cm"># 教学伪代码：用最近的 LWD 更新地质地图，再预演前方</span>
+obs = align_logs_to_sensor_md(GR, resistivity, BHA_offsets)
+prior = seismic_and_offset_well_prior()
+
+<span class="cm"># 先通过电阻率/GR 正演形成似然，再进行贝叶斯更新</span>
+posterior = bayes_update(prior, obs, forward_model)
+
+<span class="cm"># LSTM 可选：从连续后验边界变化学习下一段走势</span>
+features = make_sequence(posterior.boundary_history)
+forecast, uncertainty = lstm_or_state_model(features, horizon_m=30)
+
+<span class="cm"># 在多个可能地层中，对候选井斜执行风险评估</span>
+feasible = []
+for inclination in allowed_inclinations:
+    path = simulate_trajectory(bit_state, inclination, horizon_m=30)
+    if dogleg_within_limit(path) and drilling_constraints_ok(path):
+        risk = expected_off_zone_cost(path, forecast, uncertainty)
+        feasible.append((risk, inclination))
+
+<span class="cm"># 重要：没有可行解就请求人工复核，不自动发布</span>
+proposal = min(feasible) if feasible else None
+<span class="keyword">request_geosteering_engineer_approval(proposal)</span></code></pre>
+      <p class="small-note"><b>翻译成人话：</b>第一步“看”：确认摄像头（LWD）拍的是哪段井眼；第二步“想”：用测量修正地震草图；第三步“猜”：结合最近地层走势预测前方 30 m，还要说明预测可能错多少；第四步“比”：把几套井斜方案分别放到可能的地层地图里试跑，剔除不可行方案；最后<b>只把建议交给地质导向师，等人拍板。</b></p>
+    </article>
+    <article class="card"><div class="section-label">WHY HUMAN-IN-THE-LOOP?</div><h3>导航软件不代替司机：解释、质疑、授权</h3>
+      <div class="decision-chain"><span>已测井段</span><b>→</b><span>反演后验</span><b>→</b><span>预测走向</span><b>→</b><strong>人工审核</strong></div>
+      <p>模型可能建议：“前方 20 m 下倾约 2°，井斜由 88° 调至 86°”。但如果邻井显示该区有小断层，或现场摩阻较大，工程师完全可以拒绝并保持原井斜。</p>
+      <div class="callout"><b>人机协同不等于自动操控</b>只有点击“采纳建议”或“人工指令”，模拟控制目标才更新。滑块预览不等于真实指令；人的每次选择写入审计记录。</div>
+      <p class="small-note">评估指标包括：储层钻遇率、出靶米数、层界预测 MAE、后验区间覆盖率、人工采纳率、执行后的狗腿度。模型前瞻性需要在未参与训练的井段验证，不能以合成的储层真值曲线证明现场泛化。</p><div class="evidence-list"><h3>上井前，算法还要过哪四关？</h3>
+ <div><b>01 / 位置配准</b><span>GR、方位电阻率的测点零长分别核实</span></div>
+ <div><b>02 / 先验合理</b><span>对照邻井层位、地震分辨率与断层解释</span></div>
+ <div><b>03 / 预测可信</b><span>独立盲井验证 MAE 与区间覆盖率</span></div>
+ <div><b>04 / 人工兜底</b><span>狗腿度、摩阻、井控约束须人工签字</span></div>
+ </div>
+    </article>
+  </div>
+</section>
+
+<section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+  <div class="eyebrow">03 / LIVE DEMONSTRATION · GEOLOGICAL GUIDANCE</div>
+  <h2 class="panel-title">地下储层会起伏，路线由人确认</h2>
+  <p class="lead">自动推进的合成井段展示：绿线是实钻井眼；灰线为钻前设计；蓝虚线为 AI 预测的控制轨迹。传感器落后钻头 <b>18 m（教学假设）</b>，AI 对未来 30 m 的预测带有不确定度。</p>
+  <div class="status" id="status" role="status" aria-live="polite"><span class="status-dot"></span><b id="status-title">Human-in-the-loop：等待地质导向师指令</b><span id="status-desc">当前仍在储层内</span></div>
+  <div class="lab-grid">
+    <div class="lab-left">
+      <article class="card chart-card"><div class="card-head"><strong>井眼—储层二维剖面 / 轨迹预演</strong><span>真值仅为教学对照，实际工作中不可见</span></div>
+        <svg id="geo-chart" viewBox="0 0 820 354" role="img" aria-label="横轴水平位移，纵轴向下垂深；波浪储层顶底、真实井眼、设计轨迹与预测轨迹和LWD测点"></svg>
+        <div class="legend"><span><i class="ln actual"></i>实际井眼</span><span><i class="ln design"></i>设计轨迹</span><span><i class="ln ai"></i>AI 预测</span><span><i class="ln range"></i>后验预测区间</span><span><i class="ln sensor"></i>LWD 测点</span></div>
+        <p class="figcap">图 2｜储层真值仅用于教学显示；LWD 实际采集位置在钻头后方。前方轨迹由地质先验和滚动更新的模型外推，不是直接测得的井下图像。</p>
+      </article>
+      <article class="card chart-card"><div class="card-head"><strong>LWD 自然伽马 GR 与传感器滞后</strong><span>API · 依据测点 MD 而非钻头位置</span></div>
+        <svg id="gr-chart" viewBox="0 0 820 212" role="img" aria-label="LWD伽马测量API随测点位移的变化，传感器点落后钻头"></svg>
+        <p class="figcap">图 3｜合成 GR 响应及传感器零长：测量曲线只覆盖已通过的测点，不填造未来 30 米的真值。</p>
+      </article>
+      <article class="card tiny-chart"><div class="card-head"><strong>模型误差与前方不确定度</strong><span>先验 → 后验 → 预测区间</span></div>
+        <div class="metric-trio"><div><small>已测界面偏置</small><strong id="posterior-bias">—</strong><span>m</span></div><div><small>前方 30m 区间半宽</small><strong id="uncertainty">—</strong><span>m · 教学</span></div><div><small>测点距钻头</small><strong>18.0</strong><span>m · 设定</span></div></div>
+        <svg id="confidence-chart" viewBox="0 0 820 185" role="img" aria-label="未来三十米储层中线预测相对偏移和上下不确定度包络，横轴前方距离，纵轴相对当前钻头垂深偏移"></svg>
+        <p class="figcap">图 4｜前方 30 m 储层中线及示意不确定度带。此处宽度是教学代理函数，并非已校准的 95% 贝叶斯可信区间；外推越远，工程师越应核查邻井与地震证据。</p>
+        <p class="soft-explain">模型借助地震先验估计地层结构，再使用后方 LWD 资料修正偏置；区间不代表直接测得的未来地层。</p><div class="feedback-timeline" aria-label="预测与反馈如何关联"><div><b>看：LWD 后方测量</b><small>校正零长，更新后验</small></div><span>→</span><div><b>猜：前方 30 m 预测</b><small>显示趋势与不确定度</small></div><span>→</span><div><b>验：后续测点经过</b><small>比对误差，形成标签</small></div></div>
+      </article>
+    </div>
+    <aside class="lab-right">
+      <article class="card"><div class="card-head"><strong>随钻状态</strong><span>REAL-TIME STATE</span></div>
+        <div class="readouts"><div><small>当前井斜</small><b id="inc-now">88.0°</b></div><div><small>钻头 TVD</small><b id="tvd-now">—</b></div><div><small>横向位移</small><b id="x-now">—</b></div><div><small>GR 测点</small><b id="sensor-now">—</b></div></div>
+      </article>
+      <article class="card ai-panel" id="ai-panel"><div class="section-label">AI COPILOT / 贝叶斯更新与滚动预测</div>
+        <h3 id="ai-title">前方储层界面正在预测</h3>
+        <p class="ai-lede" id="ai-description">系统将来自传感器后方的测量与地震先验融合，生成未来 30 m 的轨迹建议。</p>
+        <div class="recommend"><div><small>建议井斜角</small><strong id="ai-inc">—</strong></div><div><small>前方 20 m 相对下倾</small><strong id="dip-forecast">—</strong></div><div><small>维持当前井斜的预测偏差</small><strong id="hold-error">—</strong></div></div>
+        <div class="checklist"><span>✓ 数据定位校正</span><span>✓ 先验 + 似然更新</span><span>✓ 对比候选轨迹</span></div>
+        <p class="small-note">这是一张“导航建议”，不是钻机控制命令。若推断远离已观测样本，应拒绝自动化下发。</p>
+      </article>
+      <article class="card"><div class="section-label">HUMAN HANDOFF / 授权点</div><div class="handoff-mini"><span>机器：预测方案</span><strong>→ 人工授权 →</strong><span>地质导向师</span></div>
+        <label for="inclination">人工拟定井斜 <output id="slider-output">88.0°</output></label>
+        <input type="range" id="inclination" min="82" max="94" step="0.5" value="88">
+        <div class="range-ends"><span>82° · 向下</span><span>94° · 向上</span></div>
+        <div class="actions"><button id="accept" class="btn primary">采纳 AI 建议调整</button><button id="manual" class="btn">执行人工指令</button><button id="hold" class="btn ghost">维持井斜，继续观察</button></div>
+        <div class="control-row"><button id="pause" class="btn mini">暂停推进</button><button id="restart" class="btn mini">重置教学井段</button></div>
+        <p class="small-note" id="control-info">滑块仅修改陶土色人工候选预览；点击人工授权后才改变模拟执行目标。</p>
+      </article>
+
+      <article class="card review-card"><div class="section-label">GEOLOGIST REVIEW / 现场审核清单</div>
+        <h3>AI 提出的井斜，能否真的执行？</h3>
+        <div class="review-rows"><div><span>测点深度</span><b>LWD 已按零长配准</b></div><div><span>地质证据</span><b>邻井、地震与电阻率对照</b></div><div><span>预测可信度</span><b>检查未来 30 m 区间</b></div><div><span>工程约束</span><b>狗腿度 / 摩阻 / 井控复核</b></div></div>
+        <p class="small-note">四项复核不可省。越过储层界面时，建议井斜仅是辅助提案，不得以 UI 的红色警报代替现场核实与安全程序。</p>
+      </article>
+    </aside>
+  </div>
+  <div class="card log-card audit-wide"><div class="card-head"><strong>人工干预与误差反馈</strong><span>FULL-WIDTH DECISION AUDIT</span></div><ol id="log-list" aria-live="polite"><li>等待地质导向师操作。每条记录保留指令、位置和预测偏差。</li></ol></div>
+  <div class="bottom-note"><b>教学提示</b> 本案例通过二维剖面解释 LWD 数据滞后和储层倾角预测；实际轨迹决策需要三维井斜、方位、狗腿度、地质模型、震动摩阻和井控校核。</div>
+</section>
+</main>
+<footer>Petro × AI Atlas <span>Drilling · D7 / Geosteering · Machine advises, human authorizes</span></footer>
+</div>
+<script src="demo.js"></script>
+</body>
+</html>

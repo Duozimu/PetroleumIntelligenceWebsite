@@ -1,0 +1,161 @@
+{
+  "id": "drilling-rop-opt",
+  "sceneId": "d1",
+  "title": "钻速预测与参数优化",
+  "version": "1.1.0",
+  "updated": "2026-11-02",
+  "methods": [
+    "ts",
+    "opt"
+  ],
+  "tabs": {
+    "background": {
+      "label": "专业背景",
+      "judge": [
+        {
+          "label": "数据形态",
+          "value": "多变量时序",
+          "desc": "秒级钻井参数 + 井段上下文"
+        },
+        {
+          "label": "标注成本",
+          "value": "中—高",
+          "desc": "异常事件与人工决策需复核"
+        },
+        {
+          "label": "可见收益",
+          "value": "提效与控险",
+          "desc": "安全边界内提高有效 ROP"
+        },
+        {
+          "label": "技术难度",
+          "value": "高",
+          "desc": "工况漂移、多约束与授权闭环"
+        }
+      ],
+      "lede": "机械钻速受岩性、钻头磨损、井底清洁、WOB 与 RPM 耦合影响，最优工况随井段变化。利用 MSE 在线诊断和 IADC 钻头磨损评级改善输入质量，使用条件时序预测 + 独立安全过滤 + 司钻授权提升有效钻进效率。",
+      "sections": [
+        {
+          "no": 1,
+          "en": "PROBLEM",
+          "title": "从 PDC 破岩到 MSE：为什么最佳 WOB 与 RPM 不是固定常数",
+          "html": "<p>PDC 钻头的切削齿剪切破岩，牙轮钻头主要采用压入、破碎；地层强度、围压、切削齿磨损以及井底岩屑清除使 WOB、RPM 与 ROP 的关系随井段动态变化。高 WOB 不保证高 ROP，反而可能增加扭矩和振动。SPE-92194-MS 提出了 MSE 在线监测辅助钻速优化的实际应用，并不意味着 MSE 是可独立决定井控安全的指标。</p><div class=\"math-card\"><b>机械比能（SI 一致单位）</b><p style=\"font-family:Georgia,serif;font-size:18px;text-align:center\">MSE = WOB / A<sub>b</sub> + 2π T<sub>bit</sub> N / (A<sub>b</sub> v)</p><p>WOB：N；A<sub>b</sub>：m²；钻头扭矩 T<sub>bit</sub>：N·m；N：rev/s；v：m/s。MSE 结果单位为 Pa。地面扭矩与井下扭矩、总 MSE 与井下 MSE 不可混用。[1][3]</p></div><p><a href=\"https://doi.org/10.2118/92194-MS\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-92194-MS · 实时 MSE 与钻速优化</a>；<a href=\"https://doi.org/10.2118/208777-PA\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-208777-PA · MSE 方程与术语标准化</a>。</p>"
+        },
+        {
+          "no": 2,
+          "en": "INTERVENTION",
+          "title": "为什么采用条件时序模型 + 约束优化，而不只做线性回归/PID",
+          "html": "<p>线性回归是可解释基线，但若不设计交互项与状态分段，难刻画 WOB×RPM、钻头磨损、地层切换与井底清洁之间的非线性。PID 可稳定单个反馈量，但不自带多目标约束求解；在测量和执行有滞后、地层快速改变时，简单追踪 ROP 易引起过度调节。</p><p><b>时序预测器</b>以过去 L 步的 WOB、RPM、Torque、ROP、排量及岩性/钻头状态为条件，预测候选控制下短期 ROP、Torque；<b>优化器</b>（PSO/GA 或离散搜索）在工程许可集内筛选高 ROP、平稳且安全的候选；<b>司钻</b>结合实时震动、井下异常及批准的安全边界决定是否授权。</p><div class=\"math-card\"><b>工程目标示意</b><p style=\"font-family:Georgia,serif;font-size:18px;text-align:center\">u* = arg max [ ROP_hat(H<sub>t</sub>,u) − λ||u−u<sub>prev</sub>||² ]</p><p>约束：Torque_hat ≤ Torque_limit − δ，ΔP_pump ≤ P_max；并满足设备能力与有效工况。当前浏览器仅演示 Torque 过滤与固定 RPM 下 WOB 离散搜索，未实现泵压和振动独立联锁。</p></div><p><b>Human-in-the-loop：</b>机器提出建议，安全约束筛选，司钻最终授权；实际响应、拒绝理由与异常形成反馈记录。</p>"
+        },
+        {
+          "no": 3,
+          "en": "DATA",
+          "title": "如何建立能反映地层和钻头状态的数据集",
+          "html": "<p>推荐将钻机采集系统的 WOB、RPM、ROP、Torque、泵排量、立管压力、钻柱振动与井深、岩性、钻井液、钻头类型及 IADC 磨损评级按时间和井深联合对齐。识别接单根、停泵、划眼、钻头更换等工况，避免污染有效 ROP 标签；训练/验证/测试应按井、井段和钻头寿命周期分组。</p><table class=\"dtable\"><thead><tr><th>数据</th><th>举例</th><th>工程作用</th></tr></thead><tbody><tr><td>表层与井下测量</td><td>WOB、RPM、ROP、Torque、Q、SPP</td><td>建立条件时序响应与异常检测</td></tr><tr><td>地层与钻头</td><td>岩性、UCS 代理、井深、IADC 磨损评级</td><td>缓解钻头钝化与岩性切换造成的漂移</td></tr><tr><td>反馈记录</td><td>司钻审批、实际执行、异常事件</td><td>离线校准与模型治理</td></tr></tbody></table><p><a href=\"https://iadc.org/drillbits/new-iadc-bit-and-bha-dull-grading-manual-now-available/\" target=\"_blank\" rel=\"noopener noreferrer\">IADC 2026 钻头/BHA 磨损评级手册（官方发布说明）</a>为记录与评级提供推荐实践，不规定通用钻压/转速安全阈值。</p>"
+        },
+        {
+          "no": 4,
+          "en": "DIFFICULTY",
+          "title": "从样本外岩性到安全责任：无法由单一扭矩阈值保证全井安全",
+          "html": "<p>新地层、钻头磨损和传感器漂移会导致模型外推；真实井下扭矩可能无法由地面扭矩无偏估计。MSE 本身还存在定义和测量误差问题 [3]。工程部署需要独立验证泵压、井漏、震动、钻具承载、井壁稳定、置信度与设备联锁。IADC 推荐实践用于磨损评级和数据采集，不是 WOB/RPM 通用安全红线。</p><div class=\"callout warn\"><span class=\"ci\">安全</span><span><b>司钻拥有最终授权权。</b>本模拟仅包含 Torque 14.40 kN·m 教学红线，PSO 与时序模型在页面中为原理讲解，实际执行为合成响应 + 离散搜索。请勿将演示输出用于现场作业。</span></div><p>参考：[1] <a href=\"https://doi.org/10.1016/0148-9062(65)90022-7\" target=\"_blank\" rel=\"noopener noreferrer\">Teale 1965</a>；[2] <a href=\"https://doi.org/10.2118/92194-MS\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-92194-MS</a>；[3] <a href=\"https://doi.org/10.2118/208777-PA\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-208777-PA</a>；[4] <a href=\"https://iadc.org/drillbits/new-iadc-bit-and-bha-dull-grading-manual-now-available/\" target=\"_blank\" rel=\"noopener noreferrer\">IADC 2026 官方推荐实践</a>。</p>"
+        }
+      ]
+    },
+    "workflow": {
+      "label": "案例流程",
+      "title": "为何采用时序模型与多约束优化：预测—安全—人工授权—反馈",
+      "lead": [
+        "由于 WOB/RPM 与 ROP 存在非线性、测量/执行有滞后且地层和钻头状态变化，固定斜率线性回归难以充分刻画响应；PID 可以做局部反馈但不负责多目标候选搜索。LSTM/TCN 做条件时序预测，PSO/GA 在安全可行域内寻优，司钻做最终授权。",
+        "工程理论支持多重约束，本教学演示实际使用非线性合成公式和固定 RPM 下 WOB 离散搜索，仅模拟 Torque 过滤。"
+      ],
+      "stats": [
+        [
+          "模型输出",
+          "ROP + Torque"
+        ],
+        [
+          "约束机制",
+          "越限截断"
+        ],
+        [
+          "最终授权",
+          "司钻（人）"
+        ],
+        [
+          "反馈闭环",
+          "时间戳日志"
+        ]
+      ],
+      "steps": [
+        {
+          "name": "传感器采集与时序对齐",
+          "role": "MACHINE / DATA",
+          "do": "采集 WOB、RPM、ROP、Torque、排量、立压、地层和钻头磨损状态；时间/井深对齐并剔除停钻及接单根。",
+          "effect": "形成可用的多变量时序与工况特征。",
+          "trap": "将停钻、接单根、滑动钻进混为同一种状态会污染 ROP 标签。"
+        },
+        {
+          "name": "条件时序响应预测",
+          "role": "AI / PREDICT",
+          "do": "以历史窗口 H_t 和候选 WOB/RPM 为条件，预测未来钻速与扭矩；可使用 LSTM/TCN，附带误差/外推检查。",
+          "effect": "给出每组候选的预测 ROP、Torque 与不确定度。",
+          "trap": "模型在陌生地层/钻头上外推失败，可能低估高扭矩风险。"
+        },
+        {
+          "name": "安全门与约束寻优",
+          "role": "MACHINE / GUARD",
+          "do": "PSO/GA 在目标函数上探索候选，独立安全门过滤 Torque、泵压和设备限值，兼顾 ROP 与调参平滑；演示仅做 Torque 过滤。",
+          "effect": "得到可解释的安全候选和拒绝原因，而不是直接执行指令。",
+          "trap": "单一扭矩约束无法覆盖井漏、井壁稳定与设备寿命风险。"
+        },
+        {
+          "name": "司钻人工授权与微调",
+          "role": "HUMAN / REQUIRED",
+          "do": "司钻结合当前振动、工具状况及现场程序，决定采纳、拒绝或手动微调；任何建议都必须经人授权。",
+          "effect": "形成真实的人机交接，保障人对最终操作的控制权。",
+          "trap": "如果推荐变更自动下发给设备，就不是真正的 Human-in-the-loop。"
+        },
+        {
+          "name": "实际结果反馈与复盘",
+          "role": "HUMAN → MODEL",
+          "do": "对比推荐值、授权值和真实响应，留存人工理由、风险与性能指标，供离线复盘及模型再训练。",
+          "effect": "改善后续模型与规则，同时保留现场决策依据。",
+          "trap": "实时未审核的数据直接重训可能引入错误标签与灾难性遗忘。"
+        }
+      ],
+      "metrics": {
+        "title": "如何量化“安全增速 + 人机协同”",
+        "html": "<p>预测维度：跨井段 ROP/Torque MAE/RMSE 与外推稳定性。优化维度：有效 ROP、MSE 趋势、Torque/压力越限率、调参幅度和停钻事件。治理维度：司钻采纳率、拒绝理由、反馈完整度。<b>任何“提速收益”必须在独立安全约束成立时报告。</b></p>"
+      },
+      "fails": [
+        {
+          "name": "模型外推遇异常高扭矩",
+          "why": "陌生地层或钻头状态可能导致 Torque 低估。处理：分布外识别、人工复核、降级到保守工况。"
+        },
+        {
+          "name": "只限制 Torque 却发生井漏",
+          "why": "井漏与压差、等效循环密度、地层承压等密切相关；必须扩展约束集。"
+        },
+        {
+          "name": "数据漂移与延迟",
+          "why": "传感器误差或时间戳错位导致参数与结果无法正确配对。处理：时间对齐与质量门控。"
+        },
+        {
+          "name": "AI 候选直接下发",
+          "why": "绕开司钻授权违背 Human-in-the-loop。方案：候选和执行值分离、操作日志可审计。"
+        },
+        {
+          "name": "把 IADC 磨损评级误当安全限值",
+          "why": "IADC 推荐实践用于钻头/BHA 损伤评级与数据质量管理，并不为各地层、钻具和钻机设定通用 WOB、RPM、Torque 上限。"
+        }
+      ]
+    },
+    "demo": {
+      "mode": "auto",
+      "html": "demo/index.html",
+      "height": 680,
+      "label": "交互演示",
+      "intro": "背景新增 MSE、IADC 与可核实 SPE 文献；流程新增条件时序预测、受约束优化目标和 Python 伪代码；演示保留原来“司钻授权后方能执行”的合成扭矩安全门。"
+    }
+  }
+}

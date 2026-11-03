@@ -1,0 +1,158 @@
+{
+  "id": "d5-mud",
+  "sceneId": "d5",
+  "title": "钻井液性能智能调控",
+  "version": "1.1.0",
+  "updated": "2026-11-02",
+  "methods": [
+    "ts",
+    "opt"
+  ],
+  "tabs": {
+    "background": {
+      "label": "专业背景",
+      "judge": [
+        {
+          "label": "数据形态",
+          "value": "多源异步时序",
+          "desc": "泵压/排量高频 + 性能化验低频"
+        },
+        {
+          "label": "标注成本",
+          "value": "中—高",
+          "desc": "实验室校验与循环时滞对齐"
+        },
+        {
+          "label": "可见收益",
+          "value": "提前感知 + 少过调",
+          "desc": "安全窗口内减少盲目加药"
+        },
+        {
+          "label": "难度",
+          "value": "中—高",
+          "desc": "强非线性、长滞后与工况漂移"
+        }
+      ],
+      "lede": "钻井液循环不是即时控制：数千米钻杆下行与环空返回、泥浆池混配和人工化验带来不同的时间滞后；井下温压与剪切历史造成非牛顿流变变化。AI 通过软测量估计隐变量，并在 ECD 安全窗口内筛选经济配方；最终由泥浆工程师核实与授权。",
+      "sections": [
+        {
+          "no": 1,
+          "en": "PROBLEM",
+          "title": "加药后的响应为什么可能越调越乱",
+          "html": "<p>大井深、低排量或较大环空体积下，药剂从地面混配到井下再回到地面，完整响应可能达到数十分钟或一小时量级，但需逐井计算。连续追着未到位的效果加药，可能过调导致 ECD 越界。现场还面临 HPHT 与非牛顿流变的强耦合。</p><p>ECD 同时包含静液柱和环空循环压耗；其安全窗口受孔隙压力与破裂压力限制。参见 <a href=\"https://onepetro.org/SPEDC/proceedings-abstract/22DC/22DC/D032S009R001/482085\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-208694-MS</a>、<a href=\"https://onepetro.org/SPEAPOG/proceedings-abstract/22APOG/22APOG/D022S003R001/511342\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-210777-MS</a> 与 <a href=\"https://iadc.org/wp-content/uploads/2025/04/WSP_Definitions_rev2.pdf\" target=\"_blank\" rel=\"noopener noreferrer\">IADC WellSharp 定义</a>。</p><table class=\"dtable\"><thead><tr><th>传统判断</th><th>AI 辅助</th></tr></thead><tbody><tr><td>等化验、观察当前泵压</td><td>利用历史时间窗提前估计井下状态，并明确预测误差</td></tr><tr><td>靠经验单项加药</td><td>先校验全井段 ECD 窗口，再比较多目标成本</td></tr></tbody></table>"
+        },
+        {
+          "no": 2,
+          "en": "INTERVENTION",
+          "title": "为什么必须结合软测量与安全约束优化",
+          "html": "<p>软测量利用入口排量、泵压、温度、井深及历史化验训练 XGBoost 或 LSTM，得到井下有效密度与表观黏度的估计。它减少信息滞后，但不能消除泥浆本身的输送延迟。近期实时流变研究见 <a href=\"https://onepetro.org/SPEMPDU/proceedings-abstract/26MPDU/26MPDU/807652\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-233721-MS</a>。</p><div class=\"math-card\"><div class=\"equation\">ℒ = (1/N) ∑(yᵢ − ŷᵢ)² + λ‖θ‖²₂</div><p>第一项衡量估计误差，第二项限制过拟合。多目标优化先剔除违反孔隙—破裂压力安全窗及裕度的候选，再综合成本、流变目标和调整量；高惩罚不能取代硬约束。</p></div>"
+        },
+        {
+          "no": 3,
+          "en": "DATA",
+          "title": "快信号 + 慢化验 + 岩屑观察与执行记录",
+          "html": "<p>传感器：入口/返出流量、立管压力、泵冲、温度、井深、泵工况。化验：泥浆密度、流变、滤失、固相含量。地层/井控：孔隙与破裂压力窗口、漏失台账。人工反馈：配方、处理剂时间、返出岩屑、化验复测和授权记录。训练时按时间和井段划分，计算输送时滞，杜绝未来标签泄漏。</p>"
+        },
+        {
+          "no": 4,
+          "en": "DIFFICULTY",
+          "title": "强非线性、井控硬约束与训练域外不确定性",
+          "html": "<p>高温高压、盐侵、滤失剂兼容性、固相和剪切历史造成强非线性与跨井段漂移。密度估计的误差会传递到 ECD 决策，必须采用独立水力校核、安全裕度与异常回退。机器只建议，泥浆工程师审批，并保留化验、岩屑和执行结果用于审计。井漏管理的人机协作研究参见 <a href=\"https://onepetro.org/SPEDC/proceedings-abstract/25DC/25DC/D012S002R001/642534\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-223817-MS</a>。</p>"
+        }
+      ]
+    },
+    "workflow": {
+      "label": "案例流程",
+      "title": "软测量解决信息滞后，多目标优化寻找安全可行的低成本配方",
+      "lead": [
+        "为什么软测量？井下密度、流变难以高频直接观测，而地面泵压、排量、温度可连续采样；估计值必须由稀疏化验和物理模型校核。软测量不消除真实循环延迟。",
+        "为什么多目标优化？先排除 ECD 超出孔隙—破裂压力窗口的方案，再在可行集内权衡加药成本、流变误差与参数变动；无可行解须回退人工。",
+        "Human-in-the-loop：工程师根据岩屑返出、化验、井控等信息决定是否采纳；反馈用于离线修正而非自动加药。"
+      ],
+      "stats": [
+        [
+          "数据输入",
+          "高低频异步"
+        ],
+        [
+          "状态预测",
+          "密度 + 黏度"
+        ],
+        [
+          "约束目标",
+          "ECD 安全窗口"
+        ],
+        [
+          "控制权",
+          "泥浆工程师"
+        ]
+      ],
+      "steps": [
+        {
+          "name": "多源数据采集与时滞对齐",
+          "role": "SENSOR / DATA",
+          "do": "同步入口排量、立压、泵冲、温度、井深与化验标签，并估计泥浆混配、输送和化验的不同滞后。",
+          "effect": "形成包含滞后关系的传感器与标签序列。",
+          "trap": "泵停数据或未来化验值混入，会制造虚假的高精度。"
+        },
+        {
+          "name": "软测量实时估计",
+          "role": "TS / SOFT SENSING",
+          "do": "基于已知传感器时序用 XGBoost/LSTM 估计井下有效密度和表观黏度，MSE + L2 示例用于解释训练与泛化，并保留校验误差。",
+          "effect": "让井下状态不再只能依赖低频取样。",
+          "trap": "软测量不等于真实井下测值，离开训练工况应退回人工。"
+        },
+        {
+          "name": "多目标安全配方优化",
+          "role": "OPT / MOO",
+          "do": "对候选处理剂配方进行水力代理计算，先筛掉 ECD 违反井控窗口的配方，再对安全候选比较药剂成本、流变偏差和变更幅度。",
+          "effect": "向工程师提交可解释、可复核的候选配方。",
+          "trap": "不可行时返回无解，不得以成本优势突破井控约束。"
+        },
+        {
+          "name": "泥浆工程师审核与授权",
+          "role": "HUMAN / APPROVAL",
+          "do": "泥浆工程师核查震动筛返出、化验和井控操作边界；可采纳、拒绝或人工调整，机器没有最终执行权。",
+          "effect": "机器建议到此为止，实际执行决定权属于人。",
+          "trap": "仅根据模拟 ECD 数字，不足以判断实际是否可加药。"
+        },
+        {
+          "name": "执行结果及人工反馈回流",
+          "role": "HUMAN → MODEL",
+          "do": "记录授权时间、处理剂实际量、估计响应、化验结果与异常，供离线评估与重新校准。",
+          "effect": "形成可追溯的新训练与验收样本。",
+          "trap": "未经过质量审核的在线自更新可能放大偏差。"
+        }
+      ],
+      "metrics": {
+        "title": "公式、评价与工程含义",
+        "html": "<p>软测量训练损失：L = (1/N) Σ(yᵢ − ŷᵢ)² + λ‖θ‖²；评价 MAE、RMSE、跨井段漂移及校准误差。配方优化：min J(u)=w₁C_material+w₂C_rheology+w₃‖Δu‖²，subject to ρ_pore(z)+δ ≤ ECD(z,u) ≤ ρ_fracture(z)−δ。ECD ≈ ρ_eff + ΔP_ann/(g·TVD)（SI 一致单位）；无可行解则不推荐。</p><p>演示采用合成水力代理和离散搜索，不声称已训练 XGBoost/LSTM，且不连接现场设备。</p><p>文献：<a href=\"https://onepetro.org/SPEDC/proceedings-abstract/22DC/22DC/D032S009R001/482085\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-208694-MS</a>；<a href=\"https://onepetro.org/SPEMPDU/proceedings-abstract/26MPDU/26MPDU/807652\" target=\"_blank\" rel=\"noopener noreferrer\">SPE-233721-MS</a>。</p>"
+      },
+      "fails": [
+        {
+          "name": "实验室标签错位",
+          "why": "返出/取样值与同一时刻井底条件不等价，必须结合循环延迟做对齐。"
+        },
+        {
+          "name": "模型外推与盐污染",
+          "why": "软测量可能对新配方、新地层误估，应该提示不确定性并请求化验复测。"
+        },
+        {
+          "name": "ECD 越界或井控事故",
+          "why": "安全过滤不应被低成本候选绕过，须以独立井控程序为最终安全边界。"
+        },
+        {
+          "name": "忽略人的岩屑观察",
+          "why": "返出岩屑与筛网工况常提供未被数字传感器完整覆盖的信息，需要人工标注与反馈。"
+        }
+      ]
+    },
+    "demo": {
+      "mode": "auto",
+      "html": "demo/index.html",
+      "height": 680,
+      "label": "交互演示",
+      "intro": "观察 ECD 安全窗口、软测量预测与化验校核；模拟高压盐水层、AI 配方推荐与泥浆工程师人工授权，再查看加药滞后和越界风险。"
+    }
+  }
+}

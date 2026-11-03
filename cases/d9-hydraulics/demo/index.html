@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="description" content="钻井水力参数智能优化：水力机理、MLP代理模型、GA硬约束寻优与钻井工程师人工授权教学案例。">
+<title>钻井水力参数智能优化 · Petro × AI Atlas</title>
+<link rel="stylesheet" href="demo.css">
+<script defer src="demo.js"></script>
+</head>
+<body>
+<div class="site-wrap">
+  <header class="doc-head">
+    <nav class="crumb" aria-label="页面位置"><span>总览</span><i>/</i><span>作业链</span><i>/</i><span>钻井</span><i>/</i><strong>钻井水力参数智能优化</strong></nav>
+    <div class="dh-kicker">
+      <span class="tag">环节 03 · 钻井</span>
+      <span class="tag method">MLP 代理模型 + 约束优化</span>
+      <span class="tag case"><span class="dot"></span>案例 d9-hydraulics · v1.0.0</span>
+    </div>
+    <h1 class="dh-title">钻井水力参数智能优化</h1>
+    <p class="dh-sub">流量更大、喷嘴更小，钻头喷射能量可能更高，但泵压、管柱压耗和设备负荷也随之增加。案例用<strong>水力代理预测 + 约束遗传搜索</strong>解释如何在安全限额内提高井底水功率；<strong>AI 只能建议，钻井工程师负责最终审批。</strong></p>
+    <div class="dh-tags"><span class="dtag">● 难度 高</span><span class="tag">D9</span><span class="tag subdued">Hydraulics · MLP · GA · Human-in-the-loop</span></div>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="三大案例板块">
+    <button type="button" class="tab on" id="tab-bg" data-tab="bg" role="tab" aria-controls="panel-bg" aria-selected="true"><span>01</span> 专业背景</button>
+    <button type="button" class="tab" id="tab-flow" data-tab="flow" role="tab" aria-controls="panel-flow" aria-selected="false"><span>02</span> 案例流程</button>
+    <button type="button" class="tab" id="tab-demo" data-tab="demo" role="tab" aria-controls="panel-demo" aria-selected="false"><span>03</span> 交互演示</button>
+  </nav>
+  <main>
+    <section class="panel" id="panel-bg" role="tabpanel" aria-labelledby="tab-bg">
+      <div class="judge">
+        <div><small>数据形态</small><b>水力多变量</b><span>Q、ρ、PV、TFA、泵压</span></div>
+        <div><small>标注成本</small><b>较高</b><span>循环试验与井底校准</span></div>
+        <div><small>核心收益</small><b>效率与安全并重</b><span>提高钻头喷射功率</span></div>
+        <div><small>工程难点</small><b>非线性耦合</b><span>温压、流变、设备限额</span></div>
+      </div>
+      <div class="intro"><span class="eyebrow">01 / PROBLEM DEFINITION · WHY AI WORKS</span><p>水力设计不是“流量越大越好”：钻头喷嘴需要足够的能量清洗井底，但额外泵压既消耗设备余量，也可能推高环空 ECD。本教学案例把<strong>可获得的喷嘴水功率</strong>与<strong>地面泵压限额</strong>同时摆在图中，让“安全约束优先”成为看得见的优化逻辑。</p></div>
+      <div class="sec4"><div class="sn">01<span>PROBLEM</span></div><div class="sec-body">
+        <h2>钻头想要更强喷射，泵却不能无限加压</h2>
+        <p>钻井泵把泥浆沿地面管线和钻柱送到井底，流体经过钻头喷嘴加速后沿环空上返。流量 Q 增大，有利于提高喷嘴射流动量；但钻柱、井下工具、喷嘴以及环空都会消耗压力。井深变长、钻井液黏度变化、喷嘴总面积变化时，<strong>原来安全的排量可能不再适用</strong>。同时，钻头水功率更高并不自动等于机械钻速更高，还需要考虑破岩响应、冲蚀与井眼清洁。</p>
+        <figure class="paper-figure">
+          <div class="figure-head"><b>钻井液循环 · 压力分配 · 钻头喷嘴</b><span>PRESSURE BUDGET / BIT NOZZLES</span></div>
+          <svg viewBox="0 0 960 405" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="泥浆从泵经立管和钻柱抵达喷嘴，喷嘴喷射后从环空返出。标明地面管柱环空压耗、钻头喷嘴压降和泵压总预算。">
+            <defs>
+              <linearGradient id="mud_bg" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e6f1ec"/><stop offset="1" stop-color="#f7faf8"/></linearGradient>
+              <marker id="arr_bg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#2f7d6b" stroke-width="1.5"/></marker>
+              <pattern id="earth_bg" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 12L12 0" stroke="#e5d7bf" stroke-width="1"/></pattern>
+            </defs>
+            <rect x="15" y="18" width="930" height="362" rx="8" fill="#fdfcf9" stroke="#e9e4d8"/>
+            <path d="M320 66H706V331H320Z" fill="url(#earth_bg)" opacity=".64"/>
+            <path d="M412 77V316Q415 345 477 345Q537 345 540 315V77" fill="url(#mud_bg)" stroke="#b2c7bf" stroke-width="2"/>
+            <rect x="444" y="73" width="61" height="243" rx="9" fill="#c4cfca" stroke="#72877f" stroke-width="2.5"/>
+            <path d="M472 115V311" stroke="#2f7d6b" stroke-width="6" marker-end="url(#arr_bg)"/>
+            <path d="M440 285V123" stroke="#2f7d6b" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#arr_bg)"/>
+            <path d="M526 286V115" stroke="#2f7d6b" stroke-width="3" stroke-dasharray="8 6" marker-end="url(#arr_bg)"/>
+            <path d="M438 316L464 347L495 347L515 316Z" fill="#8c9996" stroke="#5e706a" stroke-width="2"/>
+            <path d="M459 348L443 376M478 348V379M497 348L514 376" stroke="#41699b" stroke-width="6" stroke-linecap="round"/>
+            <rect x="71" y="105" width="188" height="94" rx="9" fill="#fff" stroke="#d7dfd7" stroke-width="2"/>
+            <rect x="89" y="126" width="57" height="50" rx="5" fill="#e6f1ec" stroke="#2f7d6b"/>
+            <circle cx="113" cy="151" r="13" fill="none" stroke="#2f7d6b" stroke-width="3"/>
+            <path d="M146 150H191" stroke="#2f7d6b" stroke-width="7"/>
+            <path d="M191 151H472V77" stroke="#2f7d6b" stroke-width="6" fill="none" marker-end="url(#arr_bg)"/>
+            <text x="87" y="94" fill="#242b2e" font-weight="700" font-size="17">泥浆泵</text><text x="88" y="217" fill="#79828a" font-size="13">输入排量 Q · 泥浆密度 ρ</text>
+            <text x="279" y="138" fill="#235f51" font-size="13">立管压力 P<tspan baseline-shift="sub" font-size="10">pump</tspan></text>
+            <text x="552" y="112" fill="#235f51" font-size="14" font-weight="650">环空返流 ↑</text>
+            <text x="548" y="223" fill="#79828a" font-size="12">环空压耗与 ECD</text>
+            <path d="M512 355L652 354" stroke="#b26a39" stroke-width="1.5" stroke-dasharray="5 4"/><text x="653" y="359" fill="#8e5229" font-size="13">喷嘴压降 ΔP<tspan baseline-shift="sub" font-size="10">bit</tspan></text>
+            <rect x="718" y="82" width="194" height="205" rx="9" fill="#fff" stroke="#e9e4d8"/>
+            <text x="736" y="105" fill="#242b2e" font-size="15" font-weight="650">立管压力预算</text>
+            <rect x="743" y="127" width="43" height="129" rx="3" fill="#e9e4d8"/>
+            <rect x="743" y="190" width="43" height="66" fill="#41699b"/>
+            <rect x="743" y="151" width="43" height="39" fill="#2f7d6b"/>
+            <rect x="743" y="127" width="43" height="24" fill="#f8ecdf"/>
+            <text x="794" y="145" fill="#8e5229" font-size="12">安全裕度</text>
+            <text x="794" y="173" fill="#235f51" font-size="12">喷嘴压降</text>
+            <text x="794" y="216" fill="#41699b" font-size="12">系统压耗</text>
+            <text x="734" y="276" fill="#79828a" font-size="10.5">P<tspan baseline-shift="sub" font-size="9">pump</tspan> = ΔP<tspan baseline-shift="sub" font-size="9">system</tspan> + ΔP<tspan baseline-shift="sub" font-size="9">bit</tspan></text>
+            <text x="37" y="355" fill="#79828a" font-size="12">水力预算必须满足设备压力、排量、喷嘴速度与井底压力窗口等多重约束</text>
+          </svg>
+          <figcaption>图 1｜钻井循环系统与立管压力分配。图中压力条为概念示意，钻头喷嘴压降并不等同于总泵压；环空摩阻还会影响 ECD。</figcaption>
+        </figure>
+        <p>经典 SPE 水力优化研究已讨论泵压可靠性、流量与钻速之间的非线性权衡；近期研究也强调不同井深和钻井液条件下的约束寻优。见 <a class="ref" href="https://doi.org/10.2118/8753-PA" target="_blank" rel="noopener noreferrer">SPE-8753-PA（1981）</a> 与 <a class="ref" href="https://doi.org/10.1504/IJOGCT.2022.123204" target="_blank" rel="noopener noreferrer">Masoomi &amp; Torabi（2022）</a>。</p>
+      </div></div>
+      <div class="sec4"><div class="sn">02<span>INTERVENTION</span></div><div class="sec-body">
+        <h2>MLP 快速估计水力响应，GA 在安全边界内挑选方案</h2>
+        <p>传统查表适合条件固定的设计，但流量、喷嘴总面积、泥浆流变和井深变化，会让压力损失呈现复杂耦合。<strong>MLP 代理模型</strong>可用已经校准的水力计算、数值模拟和现场样本训练，输入当前工况，输出喷嘴压降、系统压耗、水功率及不确定度。它相当于能够连续查询的“水力速查器”，减少每套候选方案都做完整水力模拟的代价。</p>
+        <p><strong>遗传算法 GA</strong>则把不同排量和喷嘴组合当作候选个体，筛除泵压、喷嘴速度、设备功率和 ECD 越界的候选，再比较剩余方案的钻头水功率与操作代价。GA 不保证全局最优，最终候选仍需高保真水力复核和工程师批准。</p>
+        <div class="math-card">
+          <span class="eyebrow">PHYSICS · BIT NOZZLE DROP / HYDRAULIC POWER</span>
+          <div class="math-equation">
+            <span class="math-name">Δ<i>P</i><sub>bit</sub></span><span class="math-op">=</span>
+            <span class="frac"><span class="num">ρ<i>Q</i><sup>2</sup></span><span class="den">2<i>C</i><sub>d</sub><sup>2</sup><i>A</i><sub>t</sub><sup>2</sup></span></span>
+          </div>
+          <div class="math-equation secondary"><span><i>P</i><sub>bit,kW</sub></span><span class="math-op">=</span><span>Δ<i>P</i><sub>bit,MPa</sub> · <i>Q</i><sub>L/s</sub></span></div>
+          <div class="math-grid">
+            <div><b>Q · 排量</b><span>m³/s（公式计算时需换算）</span></div>
+            <div><b>A<sub>t</sub> · 喷嘴总面积</b><span>Σπd²/4，单位 m²</span></div>
+            <div><b>C<sub>d</sub> · 流量系数</b><span>教学取 0.95，需工程校准</span></div>
+          </div>
+          <p class="math-note">喷嘴变小使 <i>A</i><sub>t</sub> 减小，同排量下 Δ<i>P</i><sub>bit</sub> 会迅速增加；井底水功率是喷嘴压降乘流量，不是总立管压力乘流量。单位换算后 1 MPa × 1 L/s = 1 kW。喷嘴过小还可能使射流速度、泵压和冲蚀风险超限。</p>
+        </div>
+      </div></div>
+      <div class="sec4"><div class="sn">03<span>DATA</span></div><div class="sec-body">
+        <h2>正确的输入数据，是避免“算出来很漂亮”的前提</h2>
+        <table class="dtable"><thead><tr><th>数据组</th><th>关键字段</th><th>作用</th></tr></thead><tbody>
+          <tr><td>泵与地面设施</td><td>排量、立压、泵额定压力/功率、管线耐压</td><td>计算可用压力预算和设备限制</td></tr>
+          <tr><td>钻头与喷嘴</td><td>喷嘴个数、直径、总过流面积 TFA、流量系数</td><td>预测 ΔP<sub>bit</sub>、射流速度与功率</td></tr>
+          <tr><td>钻井液与井深</td><td>密度、PV、YP、温度、TVD/MD、井径</td><td>系统与环空压耗、井底 ECD</td></tr>
+          <tr><td>施工反馈</td><td>实测泵压、返砂、钻速、泵负荷与异常记录</td><td>校准代理并修订优化可行域</td></tr>
+        </tbody></table>
+      </div></div>
+      <div class="sec4"><div class="sn">04<span>DIFFICULTY</span></div><div class="sec-body">
+        <h2>水力最优解不是“把泵压刚好顶到红线”</h2>
+        <p>泥浆的非牛顿流变随温压变化；井下工具、接头、喷嘴磨蚀和环空偏心均改变压耗。MLP 在未知泥浆配方或井深上可能外推失真。更重要的是，<strong>地面泵压不超过额定值不代表井底 ECD 一定安全</strong>，还需实时比较孔隙压力和破裂压力窗口。现场真正的“最优”还会考虑喷嘴磨损、钻头寿命、井眼清洁和起下钻成本。</p>
+        <div class="callout"><strong>人在回路 · 工程边界</strong> 演示中喷嘴配置可以作为下一趟钻具组合的方案对比；真实现场不能在井下直接点击按钮改变钻头喷嘴。所有压力阈值、流变响应和水功率提升值均为教学假设，不能直接用于钻井参数下发。</div>
+      </div></div>
+    </section>
+
+    <section class="panel" id="panel-flow" role="tabpanel" aria-labelledby="tab-flow" hidden>
+      <span class="eyebrow">02 / MACHINE ADVISES · ENGINEER AUTHORIZES</span>
+      <h2 class="section-title">从实时水力数据，到工程师可审核的最优方案</h2>
+      <p class="lead">把水力优化拆成五个看得懂的环节：机器读数、模型快算、GA 找方案、安全筛选、人来拍板；施工结果又能为下一轮模型校正提供证据。</p>
+      <div class="pipeline">
+        <article class="pipe"><span class="pipe-index">01 / SENSOR</span><div class="pipe-icon">◉</div><h3>数据采集与校验</h3><p>输入：泵压、排量、密度、流变、喷嘴及井深。先区分开泵、循环与停泵状态。</p><span class="pipe-foot">输出 → 当前可信工况</span></article>
+        <article class="pipe"><span class="pipe-index">02 / MLP</span><div class="pipe-icon">▥</div><h3>水力代理快速预测</h3><p>预测管柱/环空压耗、喷嘴压降和水功率，代替反复求解完整水力模型。</p><span class="pipe-foot">输出 → 候选响应数据</span></article>
+        <article class="pipe"><span class="pipe-index">03 / GA</span><div class="pipe-icon">◎</div><h3>遗传搜索 + 硬约束</h3><p>产生不同排量和喷嘴组合；先剔除越限，再优选井底水功率较高的方案。</p><span class="pipe-foot">输出 → 安全候选</span></article>
+        <article class="pipe human"><span class="pipe-index">04 / HUMAN</span><div class="pipe-icon human-svg"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="6" r="3"/><path d="M5 22v-6a7 7 0 0 1 14 0v6M9 14v8m6-8v8"/></svg></div><h3>工程师最终审批</h3><p>复核泵磨损、管线承压、井底 ECD 与喷嘴更换条件；采纳或调整方案。</p><span class="pipe-foot">Human · 最终授权</span></article>
+        <article class="pipe"><span class="pipe-index">05 / FEEDBACK</span><div class="pipe-icon">↺</div><h3>执行结果与数据回流</h3><p>记录经批准的参数、实测泵压、现场原因与后续偏差，供模型离线再校准。</p><span class="pipe-foot">人 → 现场 → 模型</span></article>
+      </div>
+      <div class="handoff"><span>机器：预测与安全候选</span><strong>机器建议 → 工程师授权</strong><span>人类：现场复核、最终决定</span></div>
+      <div class="flow-grid">
+        <div class="flow-main">
+          <div class="math-card flow-math">
+            <span class="eyebrow">MATHEMATICAL PROGRAM / SAFETY FIRST</span>
+            <div class="math-equation compact"><span class="math-name">max</span><span><i>J</i> = <i>P</i><sub>bit</sub> − λ<i>C</i><sub>oper</sub></span></div>
+            <div class="constraints">
+              <span>s.t. <i>P</i><sub>pump</sub> ≤ <i>P</i><sub>safe</sub></span>
+              <span><i>v</i><sub>jet</sub> ≤ <i>v</i><sub>limit</sub></span>
+              <span><i>W</i><sub>pump</sub> ≤ <i>W</i><sub>rated</sub></span>
+              <span>ECD<sub>min</sub> ≤ ECD ≤ ECD<sub>max</sub></span>
+            </div>
+            <p class="math-note">白话解释：先判断能否安全运行，不符合的候选直接作废；在剩余方案中，寻找钻头水功率更高、调参成本更低的组合。<i>C</i><sub>oper</sub> 表示大幅改变参数、喷嘴更换等操作代价；这里是单目标加权优化，不应将其误说成已计算出整个帕累托前沿。</p>
+          </div>
+          <div class="code-card">
+            <div class="code-head"><strong>MLP + GA · 核心 Python 风格伪代码</strong><span>TRAIN OFFLINE / INFER ONLINE</span></div>
+<pre><code><span class="cm"># 离线：用试验/高保真水力模拟训练水力代理</span>
+mlp.fit(X=[flow, density, PV, nozzle_area, depth],
+        y=[system_loss, bit_drop, ecd])
+
+<span class="cm"># 在线：遗传算法迭代候选排量与喷嘴组合</span>
+population = initialize_population(flow_bounds, nozzle_set)
+for generation in range(40):
+    scored = []
+    for flow, nozzle in population:
+        system_dp, bit_dp, ecd = mlp.predict(
+            flow, density, PV, area(nozzle), depth)
+        pump_dp = system_dp + bit_dp
+        jet_v = flow / area(nozzle)
+        <span class="hl">safe = (pump_dp &lt;= P_LIMIT and jet_v &lt;= V_LIMIT</span>
+                <span class="hl">and ecd_min &lt;= ecd &lt;= ecd_max)</span>
+        if not safe:
+            continue  <span class="cm"># 先剔除危险候选，不能拿高功率换越限</span>
+        score = bit_dp * flow - change_cost(flow, nozzle)
+        scored.append(((flow, nozzle), score))
+    population = selection_crossover_mutation(scored)
+proposal = best_feasible(scored)
+<span class="hl">submit_to_drilling_engineer(proposal)  # 人批准后才执行</span></code></pre>
+          </div>
+          <div class="plain-card"><strong>翻译成人话</strong><p>MLP 像一本经过实验校准的“水力速查手册”，问一次就得到压耗与功率；GA 像一组同时试配方的工程师，不断比较、组合和保留较好的候选。最重要的是代码中的 <code>if not safe: continue</code>：<b>先看合不合规，再看效果好不好</b>。AI 递交的是“建议书”，不是已经下发的泵指令。</p></div>
+        </div>
+        <aside class="flow-side">
+          <div class="card"><div class="eyebrow">WHY MLP?</div><h3>不用复杂模型行不行？</h3><p>公式在工况简单时可以直接计算；而复杂井眼、非牛顿泥浆和多种工具压降组合下，完整求解成本较高。MLP 能学习工况到水力响应的非线性映射，用于候选方案快速排序。</p><p>但如果现场数据不足，纯机理模型反而更可靠。因此本案例保留物理公式，用于校验代理输出。</p></div>
+          <div class="card"><div class="eyebrow">WHY GA?</div><h3>喷嘴尺寸是离散的</h3><p>真实喷嘴组合只能从已有规格中选，排量却可以连续调整。这种混合离散/连续搜索不容易简单求导。GA 可同时搜索两类变量并通过硬约束筛选可行解。</p><p>本教学页面实际上用简化水力公式和小型 GA 搜索，不是已训练的 MLP，算法框架与运行实现已明确区分。</p></div>
+          <div class="card review-card"><div class="eyebrow">HUMAN REVIEW</div><h3>三条审核红线</h3><div class="review-item"><span>01</span><b>地面设施承压</b><small>泵压、管线、泵轴功率</small></div><div class="review-item"><span>02</span><b>井底压力窗口</b><small>ECD 与破裂压力余量</small></div><div class="review-item"><span>03</span><b>钻头喷嘴可更换性</b><small>不同尺寸需下趟钻具组合实施</small></div></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+      <span class="eyebrow">03 / INTERACTIVE LAB · HYDRAULICS × GA × HUMAN</span>
+      <h2 class="section-title">把“泵压预算”变成可交互的水力实验</h2>
+      <p class="lead">左侧展示喷嘴水功率、压力包络与喷射分配；右侧给出 AI 候选、人工参数预览和审批。滑块改变的是<strong>尚未执行的草案</strong>，按下审批按钮后才改变教学模拟的执行工况。</p>
+      <div class="statebar" id="statebar" role="status" aria-live="polite"><i class="state-dot"></i><strong id="state-message">工程师监控中 · 参数草案等待审核</strong><span id="state-code">MONITORING</span></div>
+      <div class="lab-grid">
+        <div class="lab-left">
+          <article class="card chart-card">
+            <div class="card-head"><strong>流量—泵压—井底水功率双轴响应</strong><span>FLOW · PRESSURE · POWER</span></div>
+            <svg id="hydro-chart" viewBox="0 0 900 390" role="img" aria-label="横轴排量 L每秒，左纵轴立管压力 MPa，右纵轴井底水功率 kW。显示泵压安全红线、当前执行点、人工草案点与AI推荐点。"></svg>
+            <div class="legend"><span><i class="sw jade"></i>执行泵压</span><span><i class="sw blue"></i>喷嘴水功率</span><span><i class="sw clay dash"></i>人工草案</span><span><i class="sw bad dash"></i>泵压红线</span></div>
+            <p class="figcap">图 2｜左纵轴为总立管泵压（MPa），右纵轴为钻头喷嘴水功率（kW），两者不可混用同一量纲。候选状态以虚线/圆点标识，红色区域表示泵压越限。</p>
+          </article>
+          <article class="card budget-card">
+            <div class="card-head"><strong>当前立管压力如何分配？</strong><span>LIVE PRESSURE BUDGET</span></div>
+            <svg id="budget-chart" viewBox="0 0 900 205" role="img" aria-label="水平堆叠条图，显示系统压力损失、喷嘴压力损失和安全裕度，纵轴不同压力分项，横轴压力 MPa。"></svg>
+            <div class="legend"><span><i class="sw jade"></i>喷嘴压降</span><span><i class="sw blue"></i>地面管柱环空损失</span><span><i class="sw sand"></i>剩余压力裕度</span></div>
+            <p class="figcap">图 3｜将立管压力拆分为系统压耗和喷嘴压降，辅助分析能量究竟消耗在何处。压力安全线为教学降额假设，并非行业通用固定数值。</p>
+          </article>
+          <article class="card nozzle-card">
+            <div class="card-head"><strong>钻头三喷嘴流量与射流可视化</strong><span>NOZZLE AREA · JET VELOCITY</span></div>
+            <svg id="nozzle-chart" viewBox="0 0 900 198" role="img" aria-label="展示三喷嘴配置的俯视截面与射流方向，标注喷嘴直径、总面积、射流速度和流量方向。"></svg>
+            <p class="figcap">图 4｜三喷嘴的总过流面积决定同排量下的射流速度和喷嘴压降；喷嘴更换属于下一趟钻具组合计划，不可远程即时切换井底机械尺寸。</p>
+          </article>
+          <article class="card sensitivity-card">
+            <div class="card-head"><strong>相同排量下，不同喷嘴规格有何差异？</strong><span>NOZZLE SIZE / WHAT-IF</span></div>
+            <svg id="sensitivity-chart" viewBox="0 0 900 285" role="img" aria-label="横轴为喷嘴直径，左纵轴为总立管泵压 MPa，右纵轴为喷嘴水功率 kW；按当前排量比较六种三喷嘴规格，标识超限候选。"></svg>
+            <div class="legend"><span><i class="sw jade"></i>喷嘴水功率</span><span><i class="sw blue"></i>立管压力</span><span><i class="sw bad dash"></i>压力红线</span></div>
+            <p class="figcap">图 5｜固定人工草案排量时，喷嘴直径会改变水功率与泵压；一旦出现泵压、射流速度、泵轴功率或 ECD 越限，方案不能进入正式候选。</p>
+          </article>
+        </div>
+        <div class="lab-right">
+          <article class="card metrics-card">
+            <div class="card-head"><strong>实时循环参数</strong><span>EXECUTED / CURRENT</span></div>
+            <div class="metrics"><div><small>执行排量 Q</small><b id="now-flow">29.7</b><span>L/s</span></div><div><small>当前立管泵压</small><b id="now-pressure">—</b><span>MPa</span></div><div><small>井底水功率</small><b id="now-power">—</b><span>kW</span></div><div><small>当前喷嘴配置</small><b id="now-nozzle">3×12</b><span>mm</span></div></div>
+            <div class="metrics-foot"><span>泵压安全红线：<b id="p-limit">14.0 MPa</b></span><span>教学运行时刻：<b id="sim-time">T+0 s</b></span></div>
+          </article>
+          <article class="card ai-card" id="ai-card">
+            <div class="card-head"><strong>AI 水力建议 · 约束优化</strong><span>SURROGATE + GA</span></div>
+            <div class="ai-banner"><span class="ai-dot"></span><div><b id="ai-title">已找到可复核的候选方案</b><p id="ai-reason">模型正在对比水力收益与安全余量。</p></div></div>
+            <div class="ai-metrics"><div><small>推荐排量</small><b id="rec-flow">—</b></div><div><small>推荐喷嘴</small><b id="rec-nozzle">—</b></div><div><small>预测水功率提升</small><b id="rec-uplift">—</b></div><div><small>预计总泵压</small><b id="rec-pressure">—</b></div></div>
+            <p class="minor">算法只筛选教学可行域。真实工况还须核对水力模型误差、井底 ECD、泵检修状态和更换喷嘴的时机。</p>
+          </article>
+          <div class="handoff-mini"><span>机器：水力响应预测 + GA 搜索</span><strong>→ 工程师批准 →</strong><span>模拟执行与反馈</span></div>
+          <article class="card decision-card" id="decision-card">
+            <div class="card-head"><strong>工程师决策门 · Human-in-the-loop</strong><span>AWAITING HUMAN APPROVAL</span></div>
+            <label for="flow-input"><span>人工草案 · 排量</span><output id="flow-out">29.7 L/s</output></label>
+            <input id="flow-input" type="range" min="18" max="52" value="29.7" step="0.1">
+            <div class="slider-ends"><span>18 L/s</span><span>52 L/s</span></div>
+            <label for="rho-input"><span>泥浆密度 · 工况假设</span><output id="rho-out">1200 kg/m³</output></label>
+            <input id="rho-input" type="range" min="1050" max="1400" value="1200" step="25">
+            <div class="slider-ends"><span>1050 kg/m³</span><span>1400 kg/m³</span></div>
+            <label for="nozzle-input"><span>喷嘴直径 · 下一趟组合</span><output id="nozzle-out">3×12 mm</output></label>
+            <select id="nozzle-input"><option value="10">3 × 10 mm</option><option value="11">3 × 11 mm</option><option value="12" selected>3 × 12 mm</option><option value="13">3 × 13 mm</option><option value="14">3 × 14 mm</option><option value="16">3 × 16 mm</option></select>
+            <label for="pv-input"><span>塑性黏度 · PV</span><output id="pv-out">28 mPa·s</output></label>
+            <select id="pv-input"><option value="20">20 mPa·s</option><option value="28" selected>28 mPa·s</option><option value="36">36 mPa·s</option><option value="44">44 mPa·s</option></select>
+            <div id="preview-box" class="preview-box" aria-live="polite">人工草案待预测。</div>
+            <div class="actions"><button type="button" class="btn primary" id="accept-ai">采纳 AI 水力方案</button><button type="button" class="btn secondary" id="apply-manual">执行人工设定（教学）</button></div>
+            <div class="subactions"><button type="button" class="btn ghost" id="manual-reduce">手动降排量 2 L/s</button><button type="button" class="btn ghost" id="reset">重置演示</button></div>
+            <p class="decision-note" id="decision-note">滑块只预览；人工审批后才改变教学执行状态。不同喷嘴需模拟起钻更换。</p>
+          </article>
+          <article class="card review-card lab-review"><div class="card-head"><strong>现场复核与模型边界</strong><span>HUMAN CHECKLIST</span></div><div class="review-grid"><span>设备压力</span><b id="check-pressure">在教学窗口内</b><span>喷嘴射流速度</span><b id="check-jet">待计算</b><span>井底 ECD</span><b id="check-ecd">待计算</b><span>风险判断</span><b id="check-risk">持续监测</b></div><p class="minor">这四项只是教学代理的诊断结果，不等于工业井控许可或设备合格证明。</p></article>
+        </div>
+      </div>
+      <article class="card audit-card"><div class="card-head"><strong>人机交接审计 · 操作反馈数据</strong><span>AUDIT / HUMAN → MODEL</span></div><ol id="audit-list" class="audit-list" aria-live="polite"><li>教学系统初始化：监控中，等待钻井工程师明确授权。</li></ol><div class="audit-foot"><span>审批记录 <b id="audit-count">0</b> 条</span><span>本地教学记录，不会自动更新真实 MLP 权重</span></div></article>
+      <p class="safety-note">教学声明：压耗、ECD、流速上限及泵功率均为示意性设定；执行按钮仅改变浏览器内模拟数据，无设备连接。特别注意：模拟井底水功率的增大不直接证明真实 ROP 或清洁效果改善。</p>
+    </section>
+  </main>
+  <footer><span>Petro × AI Atlas · D9 · 钻井水力参数智能优化</span><span>Physics-inspired surrogate · Constrained GA · Human approval</span></footer>
+</div>
+</body>
+</html>
