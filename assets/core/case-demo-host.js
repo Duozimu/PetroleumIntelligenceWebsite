@@ -111,6 +111,63 @@
     return String(js).replace(/<\/script/gi, '<\\/script');
   }
 
+  /* One outer navigation controls a complete case page without recreating it. */
+  function embeddedPage(token, initialTab) {
+    var keys = ['bg', 'flow', 'demo'], current = initialTab, scheduled = false;
+    var panels = keys.map(function (key) { return document.getElementById('panel-' + key); });
+    if (panels.some(function (panel) { return !panel; })) return;
+    var style = document.createElement('style');
+    style.textContent = 'html,body{margin:0!important;padding:0!important;min-height:0!important;background:transparent!important;overflow:hidden!important}' +
+      '.site-wrap,.shell,.case-page,main{width:100%!important;max-width:none!important;margin:0!important;padding:0!important;min-height:0!important}' +
+      '.panel{margin-top:0!important;padding-top:16px!important}';
+    document.head.appendChild(style);
+    // Hide only the surrounding shell; retain every diagram and section within panels.
+    panels.forEach(function (panel) {
+      for (var ancestor = panel.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        Array.prototype.forEach.call(ancestor.children, function (child) {
+          if (/^(SCRIPT|STYLE|LINK)$/.test(child.tagName)) return;
+          if (!panels.some(function (p) { return child === p || child.contains(p); })) {
+            child.style.setProperty('display', 'none', 'important');
+          }
+        });
+        if (ancestor === document.body) break;
+      }
+    });
+    function report() {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(function () {
+        scheduled = false;
+        var panel = document.getElementById('panel-' + current);
+        var height = Math.ceil(panel.getBoundingClientRect().bottom + window.scrollY + 16);
+        parent.postMessage({__caseDemo: token, unified: true, tab: current, h: height}, '*');
+      });
+    }
+    function select(key) {
+      if (keys.indexOf(key) < 0) return;
+      current = key;
+      var button = document.querySelector('[data-tab="' + key + '"]');
+      if (button) button.click();
+      panels.forEach(function (panel, index) {
+        panel.hidden = keys[index] !== key;
+        panel.style.setProperty('display', keys[index] === key ? 'block' : 'none', 'important');
+      });
+      report();
+    }
+    window.addEventListener('message', function (event) {
+      if (event.source !== parent || !event.data || event.data.__caseSelect !== token) return;
+      select(event.data.tab);
+    });
+    window.addEventListener('resize', report);
+    window.addEventListener('load', report);
+    if (window.ResizeObserver) {
+      var observer = new ResizeObserver(report);
+      panels.forEach(function (panel) { observer.observe(panel); });
+    }
+    select(current);
+    parent.postMessage({__caseDemo: token, ready: true}, '*');
+  }
+
   function buildPageDoc(pkg, token) {
     var files = pkg.files || [];
     var d = pkg.demo || {};
@@ -203,7 +260,10 @@
        宿主用于展示演示，等案例自己的初始化完成后再点击其演示入口。
        仅识别标准三标签结构，普通整页示范保持原状；不改已保存的案例包。 */
     var initialTab = /^(bg|flow|demo)$/.test(d.initialTab || '') ? d.initialTab : 'demo';
-    tail += '<script>(function(){function openDemo(){' +
+    if (d.embedded) {
+      tail += '<script>(function(){var start=function(){setTimeout(function(){(' + embeddedPage.toString() + ')(' + JSON.stringify(token) + ',' + JSON.stringify(initialTab) + ')},0)};' +
+        'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start);else start();})();</script' + '>';
+    } else tail += '<script>(function(){function openDemo(){' +
       'var key=' + JSON.stringify(initialTab) + ';' +
       'var tabs=["bg","flow","demo"];' +
       'var complete=tabs.every(function(k){return document.querySelector("[data-tab="+k+"]")&&document.getElementById("panel-"+k)});' +
@@ -222,7 +282,9 @@
 
   function createPage(host, pkg, ctx) {
     var token = 'cd' + (++seq) + Date.now().toString(36);
-    var minH = Math.max(220, Number(pkg.demo && pkg.demo.height) || 520);
+    var embedded = !!(pkg.demo && pkg.demo.embedded);
+    var minH = embedded ? 220 : Math.max(220, Number(pkg.demo && pkg.demo.height) || 520);
+    var selectedTab = (pkg.demo && pkg.demo.initialTab) || 'bg';
 
     var frame = document.createElement('iframe');
     frame.className = 'cd-iframe';
@@ -237,13 +299,22 @@
       if (e.source !== frame.contentWindow) return;
       var d = e.data;
       if (!d || d.__caseDemo !== token) return;
-      var h = Math.min(6200, Math.max(minH, Number(d.h) + 2));
+      if (embedded && d.ready) {
+        frame.contentWindow.postMessage({__caseSelect: token, tab: selectedTab}, '*');
+        return;
+      }
+      if (embedded && (!d.unified || d.tab !== selectedTab)) return;
+      var h = Math.min(40000, Math.max(minH, Number(d.h) + 2));
       frame.style.height = h + 'px';
     }
     global.addEventListener('message', onMsg);
 
     return {
       mode: 'page',
+      setTab: function (key) {
+        selectedTab = key;
+        frame.contentWindow.postMessage({__caseSelect: token, tab: key}, '*');
+      },
       destroy: function () {
         global.removeEventListener('message', onMsg);
         frame.remove();

@@ -501,9 +501,12 @@
 
     var panels = '';
     if (c) {
+      if (c.unifiedPage) panels = '<div id="case-demo-root" class="case-unified-content"></div>';
+      else {
       if (c.tabs.background) panels += '<div class="panel on" data-panel="bg">' + renderBackground(sc, c) + '</div>';
       if (c.tabs.workflow) panels += '<div class="panel" data-panel="flow">' + renderWorkflow(sc, c) + '</div>';
       if (c.tabs.demo) panels += '<div class="panel" data-panel="demo">' + renderDemoShell(sc, c) + '</div>';
+      }
     }
 
     var cBadge = allCases.length
@@ -634,7 +637,10 @@
       [].forEach.call(document.querySelectorAll('.panel'), function (p) {
         p.classList.toggle('on', p.dataset.panel === key);
       });
-      if (key === 'demo') mountDemo(sc, c);
+      if (c.unifiedPage) {
+        mountDemo(sc, c, key);
+        if (c.tabs.demo.select) c.tabs.demo.select(key);
+      } else if (key === 'demo') mountDemo(sc, c);
       if (scroll) {
         var y = tabsEl.getBoundingClientRect().top + window.scrollY - 62;
         window.scrollTo({ top: y, behavior: 'smooth' });
@@ -650,11 +656,12 @@
 
     var want = { 1: 'bg', 2: 'flow', 3: 'demo' }[parseHash().q.tab] || parseHash().q.tab;
     if (want && tabsEl.querySelector('[data-tab="' + want + '"]')) activate(want, false);
+    else if (c.unifiedPage) activate('bg', false);
 
     bindChecklist();
   }
 
-  function mountDemo(sc, c) {
+  function mountDemo(sc, c, initialTab) {
     var d = c.tabs.demo;
     if (!d || typeof d.mount !== 'function') return;
     var key = c.id;
@@ -666,7 +673,7 @@
     mounted = d;
     mountedKey = key;
     try {
-      d.mount(root, { scene: sc, kase: c, K: K, atlas: A });
+      d.mount(root, { scene: sc, kase: c, K: K, atlas: A, initialTab: initialTab });
     } catch (err) {
       root.innerHTML = '<div class="callout warn"><span class="ci">错误</span><span>示范挂载失败：' +
         esc(err.message) + '。检查 <b>' + esc(c.id) + '</b> 的 tabs.demo.mount。</span></div>';

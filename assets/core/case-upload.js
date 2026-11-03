@@ -288,6 +288,10 @@
 
     /* --- 示范：三种来源 --- */
     var mode = files.length ? global.CaseDemoHost.resolveMode({ files: files, demo: cfg }) : 'none';
+    var pageFile = global.CaseDemoHost.findFile(files, cfg.html);
+    var unifiedPage = mode === 'page' && pageFile && ['bg', 'flow', 'demo'].every(function (key) {
+      return new RegExp('id=["\x27]panel-' + key + '["\x27]').test(pageFile.data);
+    });
     var handle = null;
 
     if (cfg.builtin && mode === 'none') {
@@ -309,10 +313,11 @@
         mount: function (root, ctx) {
           handle = global.CaseDemoHost.create(root, {
             files: files,
-            demo: cfg,
+            demo: Object.assign({}, cfg, unifiedPage ? {embedded: true, initialTab: ctx.initialTab || 'bg'} : {}),
             meta: rec.meta
           }, ctx);
         },
+        select: function (key) { if (handle && handle.setTab) handle.setTab(key); },
         unmount: function () {
           if (handle) { try { handle.destroy(); } catch (e) { } handle = null; }
         }
@@ -331,6 +336,7 @@
       status: 'ready',
       imported: true,
       packFiles: files.length,
+      unifiedPage: !!unifiedPage,
       tabs: tabs
     };
   }
